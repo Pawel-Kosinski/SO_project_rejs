@@ -6,6 +6,7 @@ SharedData *shared_data = NULL;
 int shm_id;
 sem_t bridge_sem;
 sem_t ship_sem;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void init_shared_memory() {
     key_t key = ftok("rejs", 'R');
