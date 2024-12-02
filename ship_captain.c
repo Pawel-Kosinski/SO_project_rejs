@@ -3,6 +3,7 @@
 void *ShipCaptain(void *arg) {
     int voyages = 1;
     while (voyages < R) {
+
         pthread_mutex_lock(&mutex);
         shared_data->loading = 1;
         printf("Kapitan: Rozpoczecie zaladunku do rejsu %d. \n", voyages);
@@ -10,6 +11,7 @@ void *ShipCaptain(void *arg) {
 
         sleep(T1);
         pthread_mutex_lock(&mutex);
+        shared_data->unloading_allowed = 0;
         shared_data->loading = 0; 
         printf("Kapitan: Zakonczenie zaladunku. Odplywamy w rejs %d.\n", voyages);
 
@@ -36,6 +38,7 @@ void *ShipCaptain(void *arg) {
 
         pthread_mutex_lock(&mutex);
         shared_data->loading = 2;
+        shared_data->unloading_allowed = 1;
         printf("Kapitan: Rejs %d zakonczony. Pasazerowie moga opuscic statek. \n", voyages);
         pthread_mutex_unlock(&mutex);
         while(1) {

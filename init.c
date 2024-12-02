@@ -30,7 +30,8 @@ void init_shared_memory() {
     shared_data->passengers_on_board = 0;
     shared_data->passengers_on_bridge = 0;
     shared_data->voyage_number = 0;
-    shared_data->loading = 1;
+    shared_data->loading = 0;
+    shared_data->boarding_allowed = 0;
 }
 
 void init_semaphores() {
@@ -44,4 +45,28 @@ void init_semaphores() {
         exit(1);
     }
 }
+
+void init_cond() {
+    if (pthread_mutex_init(&queue_mutex, NULL) != 0) {
+        perror("pthread_mutex_init queue_mutex");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pthread_cond_init(&queue_cond, NULL) != 0) {
+        perror("pthread_cond_init queue_cond");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pthread_mutex_init(&voyage_mutex, NULL) != 0) {
+        perror("pthread_mutex_init voyage_mutex");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pthread_cond_init(&voyage_cond, NULL) != 0) {
+        perror("pthread_cond_init voyage_cond");
+        exit(EXIT_FAILURE);
+    }
+}
+
+
 
