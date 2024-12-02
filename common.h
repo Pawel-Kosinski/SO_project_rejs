@@ -38,5 +38,9 @@ extern pthread_mutex_t mutex;
 // Deklaracje funkcji
 void init_shared_memory();
 void init_semaphores();
+void enter_bridge(void);
+void enter_ship(void);
+void exit_ship(void);
+void exit_bridge(void);
 
 #endif // COMMON_H
