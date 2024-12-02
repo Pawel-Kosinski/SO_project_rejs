@@ -27,9 +27,11 @@ typedef struct {
     int passengers_on_board;
     int passengers_on_bridge;
     int voyage_number;
-    int loading;
-    int boarding_allowed;
-    int unloading_allowed;
+    int loading; // 0 - brak zaladunku, 1 - zaladunek, 2 - rozladunek
+    int boarding_allowed; // 0 - nie mozna wchodzic, 1 - mozna wchodzic
+    int unloading_allowed; // 0 - nie mozna schodzic, 1 - mozna schodzic
+    int loading_finished; // Flaga informujaca o zakonczeniu zaladunku
+    int unloading_finished; // Flaga informujaca o zakonczeniu rozladunku
 } SharedData;
 
 // Deklaracje globalnych zmiennych
@@ -38,10 +40,15 @@ extern int shm_id;
 extern sem_t bridge_sem;
 extern sem_t ship_sem;
 extern pthread_mutex_t mutex;
+
 extern pthread_cond_t queue_cond; 
 extern pthread_mutex_t queue_mutex;
 extern pthread_mutex_t voyage_mutex;
 extern pthread_cond_t voyage_cond;
+extern pthread_cond_t port_cond;
+extern pthread_mutex_t port_mutex;
+extern pthread_cond_t ship_cond;
+extern pthread_mutex_t ship_mutex;
 
 // Deklaracje funkcji
 void init_shared_memory();

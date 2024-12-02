@@ -66,6 +66,26 @@ void init_cond() {
         perror("pthread_cond_init voyage_cond");
         exit(EXIT_FAILURE);
     }
+
+    if (pthread_mutex_init(&port_mutex, NULL) != 0) {
+        perror("pthread_mutex_init port_mutex");
+        exit(EXIT_FAILURE);
+    }
+    
+    if (pthread_cond_init(&port_cond, NULL) != 0) {
+        perror("pthread_cond_init port_cond");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pthread_mutex_init(&ship_mutex, NULL) != 0) {
+        perror("pthread_mutex_init ship_mutex");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pthread_cond_init(&ship_cond, NULL) != 0) {
+        perror("pthread_cond_init ship_cond");
+        exit(EXIT_FAILURE);
+    }
 }
 
 
