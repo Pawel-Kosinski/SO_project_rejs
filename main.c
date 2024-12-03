@@ -41,6 +41,19 @@ int main() {
     if (sem_destroy(&ship_sem) != 0) {
         perror("sem_destroy ship_sem");
     }
+    pthread_mutex_destroy(&mutex);
+    pthread_mutex_destroy(&queue_mutex);
+    pthread_mutex_destroy(&voyage_mutex);
+    pthread_mutex_destroy(&port_mutex);
+    pthread_mutex_destroy(&ship_mutex);
+    pthread_mutex_destroy(&bridge_empty_mutex);
+
+    pthread_cond_destroy(&queue_cond);
+    pthread_cond_destroy(&voyage_cond);
+    pthread_cond_destroy(&port_cond);
+    pthread_cond_destroy(&ship_cond);
+    pthread_cond_destroy(&bridge_empty_cond);
+
     if (shmdt(shared_data) == -1) {
         perror("shmdt");
     }

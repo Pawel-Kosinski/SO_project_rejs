@@ -6,7 +6,19 @@ SharedData *shared_data = NULL;
 int shm_id;
 sem_t bridge_sem;
 sem_t ship_sem;
+
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t voyage_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t port_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t ship_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t bridge_empty_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_cond_t queue_cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t voyage_cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t port_cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t ship_cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t bridge_empty_cond = PTHREAD_COND_INITIALIZER;
 
 void init_shared_memory() {
     key_t key = ftok("rejs", 'R');
@@ -27,11 +39,15 @@ void init_shared_memory() {
         exit(EXIT_FAILURE);
     }
 
-    shared_data->passengers_on_board = 0;
-    shared_data->passengers_on_bridge = 0;
-    shared_data->voyage_number = 0;
     shared_data->loading = 0;
     shared_data->boarding_allowed = 0;
+    shared_data->unloading_allowed = 0;
+    shared_data->loading_finished = 0;
+    shared_data->unloading_finished = 0;
+    shared_data->passengers_on_bridge = 0;
+    shared_data->passengers_on_board = 0;
+    shared_data->voyage_number = 0;
+    shared_data->bridge_empty = 0;
 }
 
 void init_semaphores() {

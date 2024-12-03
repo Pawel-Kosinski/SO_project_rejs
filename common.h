@@ -15,12 +15,12 @@
 #include <sys/ipc.h>
 #include <time.h> 
 
-#define N 100    // Maksymalna liczba pasazerow na statku
-#define K 20     // Maksymalna liczba pasazerow na mostku
-#define T1 60     // Czas miedzy rejsami
-#define T2 120    // Czas trwania rejsu
+#define N 10    // Maksymalna liczba pasazerow na statku
+#define K 7    // Maksymalna liczba pasazerow na mostku
+#define T1 30     // Czas miedzy rejsami
+#define T2 20    // Czas trwania rejsu
 #define R 2     // Maksymalna liczba rejsow
-#define NUM_PASSENGERS 82 // Liczba pasazerow
+#define NUM_PASSENGERS 10 // Liczba pasazerow
 
 // Struktura pamieci dzielonej
 typedef struct {
@@ -32,6 +32,7 @@ typedef struct {
     int unloading_allowed; // 0 - nie mozna schodzic, 1 - mozna schodzic
     int loading_finished; // Flaga informujaca o zakonczeniu zaladunku
     int unloading_finished; // Flaga informujaca o zakonczeniu rozladunku
+    int bridge_empty; // Flaga informujaca o zakonczeniu schodzenia z mostku
 } SharedData;
 
 // Deklaracje globalnych zmiennych
@@ -49,10 +50,13 @@ extern pthread_cond_t port_cond;
 extern pthread_mutex_t port_mutex;
 extern pthread_cond_t ship_cond;
 extern pthread_mutex_t ship_mutex;
+extern pthread_cond_t bridge_empty_cond;
+extern pthread_mutex_t bridge_empty_mutex;
 
 // Deklaracje funkcji
 void init_shared_memory();
 void init_semaphores();
+void init_cond();
 void enter_bridge(void);
 void enter_ship(void);
 void exit_ship(void);

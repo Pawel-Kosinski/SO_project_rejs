@@ -9,7 +9,7 @@ void enter_bridge() {
     shared_data->passengers_on_bridge++;
     printf("Pasazer %ld wchodzi na mostek. Liczba osob na mostku: %d\n", pthread_self(), shared_data->passengers_on_bridge);
     pthread_mutex_unlock(&mutex);
-    usleep((rand() % 1000 + 500) * 1000);
+    usleep((rand() % 1000 + 1000) * 1000);
 }
 
 void enter_ship() {
