@@ -15,12 +15,12 @@
 #include <sys/ipc.h>
 #include <time.h> 
 
-#define N 10    // Maksymalna liczba pasazerow na statku
-#define K 7    // Maksymalna liczba pasazerow na mostku
+#define N 29    // Maksymalna liczba pasazerow na statku
+#define K 15    // Maksymalna liczba pasazerow na mostku
 #define T1 30     // Czas miedzy rejsami
 #define T2 20    // Czas trwania rejsu
-#define R 2     // Maksymalna liczba rejsow
-#define NUM_PASSENGERS 10 // Liczba pasazerow
+#define R 5     // Maksymalna liczba rejsow
+#define NUM_PASSENGERS 30 // Liczba pasazerow
 
 // Struktura pamieci dzielonej
 typedef struct {
@@ -57,10 +57,10 @@ extern pthread_mutex_t bridge_empty_mutex;
 void init_shared_memory();
 void init_semaphores();
 void init_cond();
-void enter_bridge(void);
-void enter_ship(void);
-void exit_ship(void);
-void exit_bridge(void);
+void enter_bridge(int passenger_id);
+void enter_ship(int passenger_id);
+void exit_ship(int passenger_id);
+void exit_bridge(int passenger_id);
 void *Passenger(void *arg);
 void *PortCaptain(void *arg);
 void *ShipCaptain(void *arg);

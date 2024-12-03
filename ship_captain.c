@@ -1,13 +1,13 @@
 #include "common.h"
 
 void *ShipCaptain(void *arg) {
-    int voyages = 0;
-    while (voyages < R) {
+    int voyages = 1;
+    while (voyages <= R) {
 
         pthread_mutex_lock(&port_mutex);
         shared_data->loading = 1;
         pthread_cond_signal(&port_cond);
-        printf("Kapitan Statku: Rozpoczecie zaladunku do rejsu %d. \n", voyages + 1);
+        printf("Kapitan Statku: Rozpoczecie zaladunku do rejsu %d. \n", voyages);
         pthread_mutex_unlock(&port_mutex);
 
         pthread_mutex_lock(&ship_mutex);
@@ -36,14 +36,17 @@ void *ShipCaptain(void *arg) {
             pthread_mutex_unlock(&mutex);
         }
 
-        printf("Kapitan Statku: Rejs %d w trakcie.\n", voyages + 1);
+        printf("Kapitan Statku: Rejs %d w trakcie.\n", voyages);
         sleep(T2);
 
         pthread_mutex_lock(&port_mutex);
         shared_data->loading = 2;
         pthread_cond_signal(&port_cond);
         pthread_mutex_unlock(&port_mutex);
-        printf("Kapitan Statku: Rejs %d zakonczony. Pasazerowie moga opuscic statek. \n", voyages + 1);
+        printf("Kapitan Statku: Rejs %d zakonczony. Pasazerowie moga opuscic statek. \n", voyages);
+
+        voyages++;
+        shared_data->voyage_number = voyages;
 
         pthread_mutex_lock(&voyage_mutex);
         shared_data->unloading_allowed = 1;
@@ -78,8 +81,6 @@ void *ShipCaptain(void *arg) {
         shared_data->bridge_empty = 0;
         pthread_mutex_unlock(&bridge_empty_mutex);
         
-        voyages++;
-        shared_data->voyage_number = voyages;
     }
     printf("Kapitan Statku: Wykonano maksymalna liczbe rejsow (%d). Koncze prace. \n", R);
     pthread_exit(NULL);

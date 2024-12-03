@@ -63,7 +63,7 @@ void *PortCaptain(void *arg) {
         }
 
         pthread_mutex_lock(&ship_mutex);
-        if (shared_data->voyage_number >= R) {
+        if (shared_data->voyage_number > R) {
             pthread_mutex_unlock(&ship_mutex);
             break;
         }
