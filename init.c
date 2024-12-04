@@ -7,18 +7,18 @@ int shm_id;
 sem_t bridge_sem;
 sem_t ship_sem;
 
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t voyage_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t port_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t ship_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t bridge_empty_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex;
+pthread_mutex_t queue_mutex;
+pthread_mutex_t voyage_mutex;
+pthread_mutex_t port_mutex;
+pthread_mutex_t ship_mutex;
+pthread_mutex_t bridge_empty_mutex;
 
-pthread_cond_t queue_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t voyage_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t port_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t ship_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t bridge_empty_cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t queue_cond;
+pthread_cond_t voyage_cond;
+pthread_cond_t port_cond;
+pthread_cond_t ship_cond;
+pthread_cond_t bridge_empty_cond;
 
 void init_shared_memory() {
     key_t key = ftok("rejs", 'R');

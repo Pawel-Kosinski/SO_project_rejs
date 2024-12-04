@@ -40,16 +40,23 @@ void *PortCaptain(void *arg) {
             shared_data->unloading_finished = 0;
             pthread_mutex_unlock(&ship_mutex);
 
-            while(1) {
-                pthread_mutex_lock(&mutex);
-                if (shared_data->passengers_on_bridge == 0) {
-                    printf("Kapitan Portu: Czekam az pasazerowie opuszcza mostek.\n");
-                    pthread_mutex_unlock(&mutex);
-                    break;
-                }   
+            pthread_mutex_lock(&mutex);
+            if (shared_data->passengers_on_bridge > 0) {
+                printf("Kapitan Portu: Czekam az pasazerowie opuszcza mostek.\n");
                 pthread_mutex_unlock(&mutex);
-                sleep(1);
+                while(1) {
+                    pthread_mutex_lock(&mutex);
+                    if (shared_data->passengers_on_bridge == 0) {
+                        pthread_mutex_unlock(&mutex);
+                        break;
+                    }
+                    pthread_mutex_unlock(&mutex);
+                    sleep(1);
+                }
             }
+        else {
+            pthread_mutex_unlock(&mutex);
+        }
 
             pthread_mutex_lock(&bridge_empty_mutex);
             shared_data->bridge_empty = 1;
