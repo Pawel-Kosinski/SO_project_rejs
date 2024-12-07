@@ -1,87 +1,187 @@
 #include "common.h"
 
-void *ShipCaptain(void *arg) {
-    int voyages = 1;
-    while (voyages <= R) {
+SharedData *shared_data = NULL;
+int shm_id;
+int semid;
+int msgid;
 
-        pthread_mutex_lock(&port_mutex);
+void sem_p(int semid, unsigned short semnum) {
+    struct sembuf op;
+    op.sem_num = semnum;   
+    op.sem_op = -1;        
+    op.sem_flg = 0;        
+
+    int result = semop(semid, &op, 1);
+        if (result == -1) {
+            if(errno == EINTR){
+                semop(semid, &op, 1);
+            }
+            else {
+            perror("semop P");
+            exit(EXIT_FAILURE);
+            }
+    }
+}
+
+void sem_v(int semid, unsigned short semnum) {
+    struct sembuf op;
+    op.sem_num = semnum;   
+    op.sem_op = 1;        
+    op.sem_flg = 0;        
+
+    int result = semop(semid, &op, 1);
+        if (result == -1) {
+            if(errno == EINTR){
+                semop(semid, &op, 1);
+            }
+            else {
+            perror("semop P");
+            exit(EXIT_FAILURE);
+            }
+    }
+}
+
+void send_message(long mtype, const char *text) {
+    struct msgbuf msg;
+    msg.mtype = mtype;
+    strncpy(msg.mtext, text, sizeof(msg.mtext) - 1);
+    msg.mtext[sizeof(msg.mtext) - 1] = '\0';
+
+    if (msgsnd(msgid, &msg, sizeof(msg.mtext), 0) == -1) {
+        perror("msgsnd");
+        exit(EXIT_FAILURE);
+    }
+}
+
+int main() {
+    key_t shm_key = ftok("rejs", 'R');
+    if (shm_key == -1) {
+        perror("ftok shm_key");
+        exit(EXIT_FAILURE);
+    }
+
+    shm_id = shmget(shm_key, sizeof(SharedData), 0600);
+    if (shm_id < 0) {
+        perror("shmget");
+        exit(EXIT_FAILURE);
+    }
+
+    shared_data = (SharedData *)shmat(shm_id, NULL, 0);
+    if (shared_data == (SharedData *)-1) {
+        perror("shmat");
+        exit(EXIT_FAILURE);
+    }
+
+    // Uzyskanie semaforów
+    key_t sem_key = ftok("rejs", 'S');
+    if (sem_key == -1) {
+        perror("ftok sem_key");
+        exit(EXIT_FAILURE);
+    }
+
+    semid = semget(sem_key, 5, 0600);
+    if (semid == -1) {
+        perror("semget");
+        exit(EXIT_FAILURE);
+    }
+
+    // Uzyskanie kolejki komunikatów
+    key_t msg_key = ftok("rejs", 'M');
+    if (msg_key == -1) {
+        perror("ftok msg_key");
+        exit(EXIT_FAILURE);
+    }
+
+    msgid = msgget(msg_key, 0600);
+    if (msgid == -1) {
+        perror("msgget");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Kapitan Statku: Rozpoczynam prace.\n");
+    for (int voyages = 1; voyages <= R; voyages++) {
+
+        sem_p(semid, MUTEX_SEM);
         shared_data->loading = 1;
-        pthread_cond_signal(&port_cond);
+        shared_data->boarding_allowed = 1;
+        sem_v(semid, MUTEX_SEM);
         printf("Kapitan Statku: Rozpoczecie zaladunku do rejsu %d. \n", voyages);
-        pthread_mutex_unlock(&port_mutex);
+        send_message(MSG_TYPE_START_BOARDING, "Start boarding");
 
-        pthread_mutex_lock(&ship_mutex);
-        while(!shared_data->loading_finished) {
-            pthread_cond_wait(&ship_cond, &ship_mutex);
-        }
-        shared_data->loading_finished = 0;
-        printf("Kapitan Statku: Odplywamy w rejs %d.\n", voyages);
-        pthread_mutex_unlock(&ship_mutex);
+        sleep(T1);
 
+        sem_p(semid, MUTEX_SEM);
+        shared_data->loading_finished = 1;
+        shared_data->boarding_allowed = 0;
+        sem_v(semid, MUTEX_SEM);
+        printf("Kapitan Statku: Zaladunek zakonczony dla rejsu %d. \n", voyages);
+        
+        sem_p(semid, MUTEX_SEM);
         if (shared_data->passengers_on_bridge > 0) {
-            pthread_mutex_unlock(&mutex);
+            sem_v(semid, MUTEX_SEM);
             printf("Kapitan Statku: Czekam, az pasazerowie opuszcza mostek. \n");
 
             while(1) {
-                pthread_mutex_lock(&mutex);
+                sem_p(semid, MUTEX_SEM);
                 if (shared_data->passengers_on_bridge == 0) {
-                    pthread_mutex_unlock(&mutex);
+                    sem_v(semid, MUTEX_SEM);
                     break;
                 }
-                pthread_mutex_unlock(&mutex);
+                sem_v(semid, MUTEX_SEM);
                 sleep(1);
             }
         }
         else {
-            pthread_mutex_unlock(&mutex);
+            sem_v(semid, MUTEX_SEM);
         }
 
         printf("Kapitan Statku: Rejs %d w trakcie.\n", voyages);
         sleep(T2);
 
-        pthread_mutex_lock(&port_mutex);
+        sem_p(semid, MUTEX_SEM);
         shared_data->loading = 2;
-        pthread_cond_signal(&port_cond);
-        pthread_mutex_unlock(&port_mutex);
+        shared_data->unloading_allowed = 1;
+        sem_v(semid, MUTEX_SEM);
         printf("Kapitan Statku: Rejs %d zakonczony. Pasazerowie moga opuscic statek. \n", voyages);
 
-        voyages++;
-        shared_data->voyage_number = voyages;
+        send_message(MSG_TYPE_START_UNLOADING, "Start unloading");
 
-        pthread_mutex_lock(&voyage_mutex);
-        shared_data->unloading_allowed = 1;
-        printf("Kapitan Statku: Rozpoczynamy rozladunek pasazerow. \n");
-        pthread_cond_broadcast(&voyage_cond);
-        pthread_mutex_unlock(&voyage_mutex);
-
-        while(1) {
-            pthread_mutex_lock(&mutex);
+        sem_p(semid, MUTEX_SEM);
+        shared_data->voyage_number = voyages + 1;
+        sem_v(semid, MUTEX_SEM);
+        while (1) {
+            sem_p(semid, MUTEX_SEM);
             if (shared_data->passengers_on_board == 0) {
-                pthread_mutex_unlock(&mutex);
+                // Ustawienie flagi rozladunku zakonczonego
+                shared_data->unloading_finished = 1;
+                shared_data->unloading_allowed = 0;
+                sem_v(semid, MUTEX_SEM);
+                printf("Kapitan Statku: Wszyscy pasazerowie opuscili statek.\n");
                 break;
             }
-        pthread_mutex_unlock(&mutex);
-        sleep(1);
+            sem_v(semid, MUTEX_SEM);
+            sleep(1); // Poczekaj 1 sekunde przed ponownym sprawdzeniem
         }
 
-        pthread_mutex_lock(&voyage_mutex);
-        shared_data->unloading_allowed = 0;
-        printf("Kapitan Statku: Pasazerowie opuscili statek.\n");
-        pthread_mutex_unlock(&voyage_mutex);
-
-        pthread_mutex_lock(&ship_mutex);
-        shared_data->unloading_finished = 1;
-        pthread_cond_signal(&ship_cond);
-        pthread_mutex_unlock(&ship_mutex);
-
-        pthread_mutex_lock(&bridge_empty_mutex);
-        while (!shared_data->bridge_empty) {
-            pthread_cond_wait(&bridge_empty_cond, &bridge_empty_mutex);
+        // Poczekanie, az wszyscy pasazerowie opuszcza mostek
+        while (1) {
+            sem_p(semid, MUTEX_SEM);
+            if (shared_data->passengers_on_bridge == 0) {
+                sem_v(semid, MUTEX_SEM);
+                printf("Kapitan Statku: Wszyscy pasazerowie opuscili mostek.\n");
+                break;
+            }
+            sem_v(semid, MUTEX_SEM);
+            sleep(1); // Poczekaj 1 sekunde przed ponownym sprawdzeniem
         }
-        shared_data->bridge_empty = 0;
-        pthread_mutex_unlock(&bridge_empty_mutex);
-        
+
+        printf("Kapitan Statku: Rozladunek zakonczony dla rejsu %d. \n", voyages);
+
+
     }
     printf("Kapitan Statku: Wykonano maksymalna liczbe rejsow (%d). Koncze prace. \n", R);
-    pthread_exit(NULL);
+        if (shmdt(shared_data) == -1) {
+        perror("shmdt");
+    }
+    return 0;
 }

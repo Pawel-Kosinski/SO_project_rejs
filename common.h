@@ -14,13 +14,37 @@
 #include <sys/shm.h>
 #include <sys/ipc.h>
 #include <time.h> 
+#include <sys/sem.h>
+#include <sys/msg.h>
+
 
 #define N 29    // Maksymalna liczba pasazerow na statku
 #define K 15    // Maksymalna liczba pasazerow na mostku
 #define T1 30     // Czas miedzy rejsami
 #define T2 20    // Czas trwania rejsu
-#define R 5     // Maksymalna liczba rejsow
+#define R 2     // Maksymalna liczba rejsow
 #define NUM_PASSENGERS 30 // Liczba pasazerow
+#define MUTEX_SEM 0   
+#define BRIDGE_SEM 1
+#define SHIP_SEM   2
+#define BOARDING_SEM 3          
+#define UNLOADING_SEM 4 
+
+#define MSG_TYPE_START_BOARDING  1    // Typ komunikatu o rozpoczeciu zaladunku
+#define MSG_TYPE_START_UNLOADING 2     // Typ komunikatu o rozpoczeciu rozladunku
+#define MSG_TYPE_BOARDING_ALLOWED  3   // Typ komunikatu do pasazerow: zaladunek dozwolony
+#define MSG_TYPE_UNLOADING_ALLOWED 4   // Typ komunikatu do pasazerow: rozladunek dozwolony
+
+struct msgbuf {
+    long mtype;     // typ wiadomosci
+    char mtext[64]; // tresc
+};
+
+union semun {
+    int val;
+    struct semid_ds *buf;
+    unsigned short *array;
+};
 
 // Struktura pamieci dzielonej
 typedef struct {
@@ -38,31 +62,8 @@ typedef struct {
 // Deklaracje globalnych zmiennych
 extern SharedData *shared_data;
 extern int shm_id;
-extern sem_t bridge_sem;
-extern sem_t ship_sem;
-extern pthread_mutex_t mutex;
+extern int semid;
+extern int msgid;
 
-extern pthread_cond_t queue_cond; 
-extern pthread_mutex_t queue_mutex;
-extern pthread_mutex_t voyage_mutex;
-extern pthread_cond_t voyage_cond;
-extern pthread_cond_t port_cond;
-extern pthread_mutex_t port_mutex;
-extern pthread_cond_t ship_cond;
-extern pthread_mutex_t ship_mutex;
-extern pthread_cond_t bridge_empty_cond;
-extern pthread_mutex_t bridge_empty_mutex;
-
-// Deklaracje funkcji
-void init_shared_memory();
-void init_semaphores();
-void init_cond();
-void enter_bridge(int passenger_id);
-void enter_ship(int passenger_id);
-void exit_ship(int passenger_id);
-void exit_bridge(int passenger_id);
-void *Passenger(void *arg);
-void *PortCaptain(void *arg);
-void *ShipCaptain(void *arg);
 
 #endif // COMMON_H

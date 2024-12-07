@@ -4,21 +4,8 @@
 
 SharedData *shared_data = NULL;
 int shm_id;
-sem_t bridge_sem;
-sem_t ship_sem;
-
-pthread_mutex_t mutex;
-pthread_mutex_t queue_mutex;
-pthread_mutex_t voyage_mutex;
-pthread_mutex_t port_mutex;
-pthread_mutex_t ship_mutex;
-pthread_mutex_t bridge_empty_mutex;
-
-pthread_cond_t queue_cond;
-pthread_cond_t voyage_cond;
-pthread_cond_t port_cond;
-pthread_cond_t ship_cond;
-pthread_cond_t bridge_empty_cond;
+int semid;
+int msgid;
 
 void init_shared_memory() {
     key_t key = ftok("rejs", 'R');
@@ -48,61 +35,51 @@ void init_shared_memory() {
     shared_data->passengers_on_board = 0;
     shared_data->voyage_number = 0;
     shared_data->bridge_empty = 0;
-}
-
-void init_semaphores() {
-    if (sem_init(&bridge_sem, 1, K) != 0) {
-        perror("sem_init bridge_sem");
-        exit(1);
-    }
-
-    if (sem_init(&ship_sem, 1, N) != 0) {
-        perror("sem_init ship_sem");
-        exit(1);
-    }
-}
-
-void init_cond() {
-    if (pthread_mutex_init(&queue_mutex, NULL) != 0) {
-        perror("pthread_mutex_init queue_mutex");
-        exit(EXIT_FAILURE);
-    }
-
-    if (pthread_cond_init(&queue_cond, NULL) != 0) {
-        perror("pthread_cond_init queue_cond");
-        exit(EXIT_FAILURE);
-    }
-
-    if (pthread_mutex_init(&voyage_mutex, NULL) != 0) {
-        perror("pthread_mutex_init voyage_mutex");
-        exit(EXIT_FAILURE);
-    }
-
-    if (pthread_cond_init(&voyage_cond, NULL) != 0) {
-        perror("pthread_cond_init voyage_cond");
-        exit(EXIT_FAILURE);
-    }
-
-    if (pthread_mutex_init(&port_mutex, NULL) != 0) {
-        perror("pthread_mutex_init port_mutex");
-        exit(EXIT_FAILURE);
-    }
     
-    if (pthread_cond_init(&port_cond, NULL) != 0) {
-        perror("pthread_cond_init port_cond");
-        exit(EXIT_FAILURE);
-    }
-
-    if (pthread_mutex_init(&ship_mutex, NULL) != 0) {
-        perror("pthread_mutex_init ship_mutex");
-        exit(EXIT_FAILURE);
-    }
-
-    if (pthread_cond_init(&ship_cond, NULL) != 0) {
-        perror("pthread_cond_init ship_cond");
-        exit(EXIT_FAILURE);
-    }
 }
 
+int create_semaphore(key_t key) {
+    semid = semget(key, 5, 0600 | IPC_CREAT);
+    if (semid == -1) {
+        perror("semget");
+        exit(EXIT_FAILURE);
+    }
 
+    unsigned short initial_values[5] = {1, K, N, 0, 0}; // MUTEX_SEM=1, BRIDGE_SEM=K, SHIP_SEM=N, BOARDING_SEM=0, UNLOADING_SEM=0
 
+    union semun arg;
+    arg.array = initial_values;
+    if (semctl(semid, 0, SETALL, arg) == -1) {
+        perror("semctl SETALL");
+        exit(EXIT_FAILURE);
+    }
+    return semid;
+}
+
+int main() {
+    printf("Inicjalizacja zasobow. \n");
+
+    init_shared_memory();
+
+    key_t key_s = ftok("rejs", 'S');
+    if (key_s == -1) {
+        perror("ftok key_s");
+        exit(EXIT_FAILURE);
+    }
+
+    semid = create_semaphore(key_s);
+
+    key_t msg_key = ftok("rejs", 'M');
+    if (msg_key == -1) {
+        perror("ftok msg_key");
+        exit(EXIT_FAILURE);
+    }
+
+    msgid = msgget(msg_key, IPC_CREAT | 0600);
+    if (msgid == -1) {
+        perror("msgget");
+        exit(EXIT_FAILURE);
+    }
+    printf("Inicjalizacja zakonczona.\n");
+    return 0;
+}
