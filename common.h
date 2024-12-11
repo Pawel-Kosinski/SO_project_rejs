@@ -18,17 +18,16 @@
 #include <sys/msg.h>
 
 
-#define N 29    // Maksymalna liczba pasazerow na statku
-#define K 15    // Maksymalna liczba pasazerow na mostku
-#define T1 30     // Czas miedzy rejsami
+#define N 50    // Maksymalna liczba pasazerow na statku
+#define K 20    // Maksymalna liczba pasazerow na mostku
+#define T1 60     // Czas miedzy rejsami
 #define T2 20    // Czas trwania rejsu
-#define R 2     // Maksymalna liczba rejsow
-#define NUM_PASSENGERS 30 // Liczba pasazerow
-#define MUTEX_SEM 0   
-#define BRIDGE_SEM 1
-#define SHIP_SEM   2
-#define BOARDING_SEM 3          
-#define UNLOADING_SEM 4 
+#define R 4     // Maksymalna liczba rejsow
+#define NUM_PASSENGERS 60 // Liczba pasazerow  
+#define BRIDGE_SEM 0
+#define SHIP_SEM   1
+#define BOARDING_SEM 2          
+#define UNLOADING_SEM 3 
 
 #define MSG_TYPE_START_BOARDING  1    // Typ komunikatu o rozpoczeciu zaladunku
 #define MSG_TYPE_START_UNLOADING 2     // Typ komunikatu o rozpoczeciu rozladunku
@@ -54,9 +53,9 @@ typedef struct {
     int loading; // 0 - brak zaladunku, 1 - zaladunek, 2 - rozladunek
     int boarding_allowed; // 0 - nie mozna wchodzic, 1 - mozna wchodzic
     int unloading_allowed; // 0 - nie mozna schodzic, 1 - mozna schodzic
-    int loading_finished; // Flaga informujaca o zakonczeniu zaladunku
-    int unloading_finished; // Flaga informujaca o zakonczeniu rozladunku
     int bridge_empty; // Flaga informujaca o zakonczeniu schodzenia z mostku
+    pthread_mutex_t mutex;
+    //pthread_cond_t cond_boarding;
 } SharedData;
 
 // Deklaracje globalnych zmiennych

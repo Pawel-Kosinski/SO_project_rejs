@@ -5,3 +5,5 @@ init
 passenger
 port_captain
 ship_captain
+*.o
+*.sh

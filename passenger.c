@@ -21,6 +21,8 @@ void sem_p(int semid, unsigned short semnum) {
             exit(EXIT_FAILURE);
             }
     }
+    //int val = semctl(semid, semnum, GETVAL);
+    //printf("Aktualna wartosc na semaforze %d: %d\n" , semnum, val);
 }
 
 void sem_v(int semid, unsigned short semnum) {
@@ -39,46 +41,50 @@ void sem_v(int semid, unsigned short semnum) {
             exit(EXIT_FAILURE);
             }
     }
+    //int val = semctl(semid, semnum, GETVAL);
+    //printf("Aktualna wartosc na semaforze %d: %d\n", semnum, val);
 }
 
 void enter_bridge(int passenger_id, int semid, SharedData *shared_data) {
-
+    usleep((rand() % 5000 + 5000) * 1000);
     sem_p(semid, BRIDGE_SEM);
-    sem_p(semid, MUTEX_SEM);
+    pthread_mutex_lock(&shared_data->mutex);
     shared_data->passengers_on_bridge++;
     printf("Pasazer %d wchodzi na mostek. Liczba osob na mostku: %d\n", passenger_id, shared_data->passengers_on_bridge);
-    sem_v(semid, MUTEX_SEM);
+    pthread_mutex_unlock(&shared_data->mutex);
     usleep((rand() % 5000 + 5000) * 1000);
-}
-
-void enter_ship(int passenger_id, int semid, SharedData *shared_data) {
     
-    sem_p(semid, SHIP_SEM);
-    sem_p(semid, MUTEX_SEM);
-    shared_data->passengers_on_board++;
-    shared_data->passengers_on_bridge--;
-    printf("Pasazer %d wchodzi na statek. Liczba osob na statku: %d\n", passenger_id, shared_data->passengers_on_board);
-    sem_v(semid, MUTEX_SEM);
-    sem_v(semid, BRIDGE_SEM);
-    usleep((rand() % 1000 + 500) * 1000);
 }
-
-void exit_ship(int passenger_id, int semid, SharedData *shared_data) {
-    sem_p(semid, MUTEX_SEM);
-    shared_data->passengers_on_board--;
-    printf("Pasazer %d opuszcza statek. Liczba osob na statku: %d\n", passenger_id, shared_data->passengers_on_board);
-    sem_v(semid, MUTEX_SEM);
-    sem_v(semid, SHIP_SEM);
-    usleep((rand() % 1000 + 500) * 1000);
-}
-
 void exit_bridge(int passenger_id, int semid, SharedData *shared_data) {
-    sem_p(semid, MUTEX_SEM);
+    usleep((rand() % 5000 + 5000) * 1000);
+    pthread_mutex_lock(&shared_data->mutex);
     sem_v(semid, BRIDGE_SEM);
     shared_data->passengers_on_bridge--;
     printf("Pasazer %d schodzi z mostku. Liczba osob na mostku: %d\n", passenger_id, shared_data->passengers_on_bridge);
-    sem_v(semid, MUTEX_SEM);
-    usleep((rand() % 1000 + 500) * 1000);
+    pthread_mutex_unlock(&shared_data->mutex);
+    //usleep((rand() % 2000 + 1000) * 1000);
+}
+
+void enter_ship(int passenger_id, int semid, SharedData *shared_data) {
+    //usleep((rand() % 5000 + 5000) * 1000);
+    sem_p(semid, SHIP_SEM);
+    //pthread_mutex_lock(&shared_data->mutex);
+    shared_data->passengers_on_bridge--;
+    
+    sem_v(semid, BRIDGE_SEM);
+    printf("Pasazer %d wchodzi na statek. Liczba osob na statku: %d\n", passenger_id, shared_data->passengers_on_board);
+    pthread_mutex_unlock(&shared_data->mutex);
+    
+}
+
+void exit_ship(int passenger_id, int semid, SharedData *shared_data) {
+    usleep((rand() % 5000 + 5000) * 1000);
+    sem_v(semid, SHIP_SEM);
+    pthread_mutex_lock(&shared_data->mutex);
+    shared_data->passengers_on_board--;
+    printf("Pasazer %d opuszcza statek. Liczba osob na statku: %d\n", passenger_id, shared_data->passengers_on_board);
+    pthread_mutex_unlock(&shared_data->mutex);
+    
 }
 
 typedef struct {
@@ -98,14 +104,14 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    int shm_id_local = shmget(shm_key, sizeof(SharedData), 0600);
-    if (shm_id_local < 0) {
+    shm_id = shmget(shm_key, sizeof(SharedData), 0600);
+    if (shm_id < 0) {
         perror("shmget");
         exit(EXIT_FAILURE);
     }
 
-    SharedData *local_shared_data = (SharedData *)shmat(shm_id_local, NULL, 0);
-    if (local_shared_data == (SharedData *) -1) {
+    shared_data = (SharedData *)shmat(shm_id, NULL, 0);
+    if (shared_data == (SharedData *) -1) {
         perror("shmat");
         exit(EXIT_FAILURE);
     }
@@ -116,7 +122,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
     
-    semid = semget(sem_key, 5, 0600);
+    semid = semget(sem_key, 4, 0600);
     if (semid == -1) {
         perror("semget");
         exit(EXIT_FAILURE);
@@ -133,8 +139,6 @@ int main() {
         perror("msgget");
         exit(EXIT_FAILURE);
     }
-
-    shared_data = local_shared_data;
 
     pthread_t threads[NUM_PASSENGERS];
     PassengerArgs args[NUM_PASSENGERS];
@@ -153,12 +157,11 @@ int main() {
         pthread_join(threads[i], NULL);
     }
 
-    // Odłączenie pamięci współdzielonej
     if (shmdt(shared_data) == -1) {
         perror("shmdt");
     }
 
-    printf("Program pasażera zakończył działanie.\n");
+    printf("Program pasazera zakonczyl dzialanie.\n");
     return 0;
 }
 
@@ -168,55 +171,69 @@ void *Passenger(void* args) {
     int passenger_id = p_args->passenger_id;
     int semid = p_args->semid;
     SharedData *shared_data = p_args->shared_data;
-
+    printf("Pasazer %d przybyl do kolejki. \n", passenger_id);
     while (1) {
-        printf("Pasazer %d przybyl do kolejki. \n", passenger_id);
-
-        struct msgbuf msg;
-        if (msgrcv(msgid, &msg, sizeof(msg.mtext), MSG_TYPE_BOARDING_ALLOWED, 0) == -1) {
-            perror("msgrcv boarding_allowed");
-            exit(EXIT_FAILURE);
+        while(1) {
+            pthread_mutex_lock(&shared_data->mutex);
+            if (shared_data->boarding_allowed == 1) {
+                pthread_mutex_unlock(&shared_data->mutex);
+                break;
+            } else {
+                //printf("Pasazer %d: Czeka na sygnal rozpoczecia zaladunku .\n", passenger_id);
+                pthread_mutex_unlock(&shared_data->mutex);
+                sleep(1);
+            }
         }
-
+        
         enter_bridge(passenger_id, semid, shared_data);
-
-        sem_p(semid, MUTEX_SEM);
+        pthread_mutex_lock(&shared_data->mutex);
         if (shared_data->loading == 1) {
-            sem_v(semid, MUTEX_SEM);
-            enter_ship(passenger_id, semid, shared_data);
+            if (shared_data->passengers_on_board < N) {
+                shared_data->passengers_on_board++;
+                //pthread_mutex_unlock(&shared_data->mutex);
+                enter_ship(passenger_id, semid, shared_data);
+
+                struct msgbuf msg;    
+                if (msgrcv(msgid, &msg, sizeof(msg.mtext), MSG_TYPE_UNLOADING_ALLOWED, 0) == -1) {
+                    perror("msgrcv unloading_allowed");
+                    pthread_exit(NULL);
+                }
+
+                usleep((rand() % 2000 + 500) * 1000);
+                exit_ship(passenger_id, semid, shared_data);
+                
+                while(1) {
+                    pthread_mutex_lock(&shared_data->mutex);
+                    if (shared_data->loading == 2) {
+                        pthread_mutex_unlock(&shared_data->mutex);
+                        enter_bridge(passenger_id, semid, shared_data);
+                        break;
+                    } else {
+                        pthread_mutex_unlock(&shared_data->mutex);
+                        sleep(1);
+                    }
+                }
+                exit_bridge(passenger_id, semid, shared_data);  
+            }
+            else {
+                pthread_mutex_unlock(&shared_data->mutex);
+                printf("Maksymalna ilosc osob na statku. Pasazer %d schodzi z mostku.\n", passenger_id);
+                exit_bridge(passenger_id, semid, shared_data);
+            }
+   
         }
         else {
-            sem_v(semid, MUTEX_SEM);
+            pthread_mutex_unlock(&shared_data->mutex);
             exit_bridge(passenger_id, semid, shared_data);
-            pthread_exit(NULL);
         }
-        
-        if (msgrcv(msgid, &msg, sizeof(msg.mtext), MSG_TYPE_UNLOADING_ALLOWED, 0) == -1) {
-            perror("msgrcv unloading_allowed");
-            pthread_exit(NULL);
-        }
-
-        exit_ship(passenger_id, semid, shared_data);
-        
-        sem_p(semid, MUTEX_SEM);
-        if (shared_data->loading == 2) {
-            sem_v(semid, MUTEX_SEM);
-            enter_bridge(passenger_id, semid, shared_data);
-        } else {
-            sem_v(semid, MUTEX_SEM);
-            sleep(1);
-        }
-
-        usleep((rand() % 2000 + 500) * 1000);
-        exit_bridge(passenger_id, semid, shared_data);
-
-        sem_p(semid, MUTEX_SEM);
-        if (shared_data->voyage_number > R) {
-            sem_v(semid, MUTEX_SEM);
+        pthread_mutex_lock(&shared_data->mutex);
+        if (shared_data->voyage_number >= R) {
+            pthread_mutex_unlock(&shared_data->mutex);
             break;
         }
-        sem_v(semid, MUTEX_SEM);
+        pthread_mutex_unlock(&shared_data->mutex);   
     }
+    printf("Pasazer %d zakonczyl prace. \n", passenger_id);
     pthread_exit(NULL);
 }
 

@@ -29,8 +29,6 @@ void init_shared_memory() {
     shared_data->loading = 0;
     shared_data->boarding_allowed = 0;
     shared_data->unloading_allowed = 0;
-    shared_data->loading_finished = 0;
-    shared_data->unloading_finished = 0;
     shared_data->passengers_on_bridge = 0;
     shared_data->passengers_on_board = 0;
     shared_data->voyage_number = 0;
@@ -39,13 +37,13 @@ void init_shared_memory() {
 }
 
 int create_semaphore(key_t key) {
-    semid = semget(key, 5, 0600 | IPC_CREAT);
+    semid = semget(key, 4, 0600 | IPC_CREAT);
     if (semid == -1) {
         perror("semget");
         exit(EXIT_FAILURE);
     }
 
-    unsigned short initial_values[5] = {1, K, N, 0, 0}; // MUTEX_SEM=1, BRIDGE_SEM=K, SHIP_SEM=N, BOARDING_SEM=0, UNLOADING_SEM=0
+    unsigned short initial_values[4] = {K, N, 0, 0}; //BRIDGE_SEM=K, SHIP_SEM=N, BOARDING_SEM=0, UNLOADING_SEM=0
 
     union semun arg;
     arg.array = initial_values;
@@ -80,6 +78,38 @@ int main() {
         perror("msgget");
         exit(EXIT_FAILURE);
     }
+        // Inicjalizacja mutexa
+    pthread_mutexattr_t mutex_attr;
+    if (pthread_mutexattr_init(&mutex_attr) != 0) {
+        perror("pthread_mutexattr_init");
+        exit(EXIT_FAILURE);
+    }
+    if (pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED) != 0) {
+        perror("pthread_mutexattr_setpshared");
+        exit(EXIT_FAILURE);
+    }
+    if (pthread_mutex_init(&shared_data->mutex, &mutex_attr) != 0) {
+        perror("pthread_mutex_init");
+        exit(EXIT_FAILURE);
+    }
+    pthread_mutexattr_destroy(&mutex_attr);
+
+    // Inicjalizacja zmiennej warunkowej
+    /*pthread_condattr_t cond_boarding_attr;
+    if (pthread_condattr_init(&cond_boarding_attr) != 0) {
+        perror("pthread_condattr_init");
+        exit(EXIT_FAILURE);
+    }
+    if (pthread_condattr_setpshared(&cond_boarding_attr, PTHREAD_PROCESS_SHARED) != 0) {
+        perror("pthread_condattr_setpshared");
+        exit(EXIT_FAILURE);
+    }
+    if (pthread_cond_init(&shared_data->cond_boarding, &cond_boarding_attr) != 0) {
+        perror("pthread_cond_init");
+        exit(EXIT_FAILURE);
+    }
+    pthread_condattr_destroy(&cond_boarding_attr);*/
+
     printf("Inicjalizacja zakonczona.\n");
     return 0;
 }
