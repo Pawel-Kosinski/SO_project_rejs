@@ -18,21 +18,19 @@
 #include <sys/msg.h>
 
 
+
 #define N 50    // Maksymalna liczba pasazerow na statku
-#define K 20    // Maksymalna liczba pasazerow na mostku
-#define T1 60     // Czas miedzy rejsami
+#define K 15   // Maksymalna liczba pasazerow na mostku
+#define T1 50     // Czas miedzy rejsami
 #define T2 20    // Czas trwania rejsu
-#define R 4     // Maksymalna liczba rejsow
-#define NUM_PASSENGERS 60 // Liczba pasazerow  
+#define R 2     // Maksymalna liczba rejsow
+#define NUM_PASSENGERS 30 // Liczba pasazerow  
 #define BRIDGE_SEM 0
 #define SHIP_SEM   1
-#define BOARDING_SEM 2          
-#define UNLOADING_SEM 3 
 
 #define MSG_TYPE_START_BOARDING  1    // Typ komunikatu o rozpoczeciu zaladunku
-#define MSG_TYPE_START_UNLOADING 2     // Typ komunikatu o rozpoczeciu rozladunku
-#define MSG_TYPE_BOARDING_ALLOWED  3   // Typ komunikatu do pasazerow: zaladunek dozwolony
-#define MSG_TYPE_UNLOADING_ALLOWED 4   // Typ komunikatu do pasazerow: rozladunek dozwolony
+#define MSG_TYPE_START_UNLOADING 2     // Typ komunikatu o rozpoczeciu rozladunku   
+#define MSG_TYPE_UNLOADING_ALLOWED 3   // Typ komunikatu do pasazerow: rozladunek dozwolony
 
 struct msgbuf {
     long mtype;     // typ wiadomosci
@@ -53,7 +51,7 @@ typedef struct {
     int loading; // 0 - brak zaladunku, 1 - zaladunek, 2 - rozladunek
     int boarding_allowed; // 0 - nie mozna wchodzic, 1 - mozna wchodzic
     int unloading_allowed; // 0 - nie mozna schodzic, 1 - mozna schodzic
-    int bridge_empty; // Flaga informujaca o zakonczeniu schodzenia z mostku
+    int loading_finished; // 0 - zaladunek trwa, 1 - zaladunek skonczony
     pthread_mutex_t mutex;
     //pthread_cond_t cond_boarding;
 } SharedData;

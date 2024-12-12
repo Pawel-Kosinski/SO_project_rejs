@@ -46,7 +46,7 @@ void sem_v(int semid, unsigned short semnum) {
 }
 
 void enter_bridge(int passenger_id, int semid, SharedData *shared_data) {
-    usleep((rand() % 5000 + 5000) * 1000);
+    usleep((rand() % 8000 + 2000) * 1000);
     sem_p(semid, BRIDGE_SEM);
     pthread_mutex_lock(&shared_data->mutex);
     shared_data->passengers_on_bridge++;
@@ -56,7 +56,7 @@ void enter_bridge(int passenger_id, int semid, SharedData *shared_data) {
     
 }
 void exit_bridge(int passenger_id, int semid, SharedData *shared_data) {
-    usleep((rand() % 5000 + 5000) * 1000);
+    //usleep((rand() % 5000 + 5000) * 1000);
     pthread_mutex_lock(&shared_data->mutex);
     sem_v(semid, BRIDGE_SEM);
     shared_data->passengers_on_bridge--;
@@ -78,7 +78,7 @@ void enter_ship(int passenger_id, int semid, SharedData *shared_data) {
 }
 
 void exit_ship(int passenger_id, int semid, SharedData *shared_data) {
-    usleep((rand() % 5000 + 5000) * 1000);
+    usleep((rand() % 8000 + 2000) * 1000);
     sem_v(semid, SHIP_SEM);
     pthread_mutex_lock(&shared_data->mutex);
     shared_data->passengers_on_board--;
@@ -122,7 +122,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
     
-    semid = semget(sem_key, 4, 0600);
+    semid = semget(sem_key, 2, 0600);
     if (semid == -1) {
         perror("semget");
         exit(EXIT_FAILURE);
@@ -199,7 +199,6 @@ void *Passenger(void* args) {
                     pthread_exit(NULL);
                 }
 
-                usleep((rand() % 2000 + 500) * 1000);
                 exit_ship(passenger_id, semid, shared_data);
                 
                 while(1) {
@@ -216,9 +215,15 @@ void *Passenger(void* args) {
                 exit_bridge(passenger_id, semid, shared_data);  
             }
             else {
-                pthread_mutex_unlock(&shared_data->mutex);
-                printf("Maksymalna ilosc osob na statku. Pasazer %d schodzi z mostku.\n", passenger_id);
-                exit_bridge(passenger_id, semid, shared_data);
+                if (shared_data->loading_finished = 1) {
+                    pthread_mutex_unlock(&shared_data->mutex);
+                    printf("Maksymalna ilosc osob na statku. Pasazer %d schodzi z mostku.\n", passenger_id);
+                    exit_bridge(passenger_id, semid, shared_data);
+                }
+                else {
+                    pthread_mutex_unlock(&shared_data->mutex);
+                    sleep(1);
+                }
             }
    
         }

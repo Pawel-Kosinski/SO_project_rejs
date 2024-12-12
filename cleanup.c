@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <string.h>
 
-// Zakładamy, że SharedData ma tylko jeden mutex (mutex) i dwie zmienne warunkowe (cond_boarding, cond_unloading).
 
 int main() {
     printf("Rozpoczynanie procesu czyszczenia zasobow IPC.\n");
@@ -26,7 +25,6 @@ int main() {
     key_t shm_key = ftok("rejs", 'R');
     if (shm_key == -1) {
         perror("ftok shm_key");
-        // Możemy kontynuować, ale bez poprawnego klucza nie usuniemy pamięci
     }
 
     key_t sem_key = ftok("rejs", 'S');
@@ -71,7 +69,7 @@ int main() {
 
     // Usuwanie semaforow
     if (sem_key != -1) {
-        int semid_local = semget(sem_key, 4, 0600); 
+        int semid_local = semget(sem_key, 2, 0600); 
         if (semid_local == -1) {
             if (errno == ENOENT) {
                 printf("Zestaw semaforow nie istnieje.\n");

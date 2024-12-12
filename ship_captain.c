@@ -53,7 +53,18 @@ void send_message(long mtype, const char *text) {
     }
 }
 
+void alarm_handler(int sig) {
+    pthread_mutex_lock(&shared_data->mutex);
+    if (shared_data->loading_finished == 0) {
+        printf("Kapitan Statku: Czas na zaladunek uplynal. \n");
+        shared_data->loading_finished = 1;
+        pthread_mutex_unlock(&shared_data->mutex);
+    }
+    pthread_mutex_unlock(&shared_data->mutex);
+}
+
 int main() {
+    signal(SIGALRM, alarm_handler);
     key_t shm_key = ftok("rejs", 'R');
     if (shm_key == -1) {
         perror("ftok shm_key");
@@ -78,7 +89,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    semid = semget(sem_key, 4, 0600);
+    semid = semget(sem_key, 2, 0600);
     if (semid == -1) {
         perror("semget");
         exit(EXIT_FAILURE);
@@ -104,18 +115,31 @@ int main() {
         pthread_mutex_unlock(&shared_data->mutex);
 
         pthread_mutex_lock(&shared_data->mutex);
+        shared_data->loading_finished = 0;
         shared_data->loading = 1;
         pthread_mutex_unlock(&shared_data->mutex);
         printf("Kapitan Statku: Rozpoczecie zaladunku do rejsu %d. \n", voyages);
         send_message(MSG_TYPE_START_BOARDING, "Start boarding");
 
-        sleep(T1);
+        alarm(T1);
+        pthread_mutex_lock(&shared_data->mutex);
+        while(shared_data->loading_finished == 0){
+            if(shared_data->passengers_on_board == N || shared_data->passengers_on_board == NUM_PASSENGERS){
+                printf("Kapitan Statku: Osiagnieto maksymalna ilosc pasazerow na statku. Przedwczesne zakonczenie zaladunku.\n");
+                shared_data->loading_finished = 1;
+                pthread_mutex_unlock(&shared_data->mutex);
+            }
+            else {
+                pthread_mutex_unlock(&shared_data->mutex);
+                sleep(1);
+            }
+        }
 
         pthread_mutex_lock(&shared_data->mutex);
         shared_data->boarding_allowed = 0; 
         shared_data->loading = 0;
         pthread_mutex_unlock(&shared_data->mutex);
-        printf("Kapitan Statku: Zaladunek zakonczony dla rejsu %d. \n", voyages);
+        //printf("Kapitan Statku: Zaladunek zakonczony dla rejsu %d. \n", voyages);
         
         pthread_mutex_lock(&shared_data->mutex);
         if (shared_data->passengers_on_bridge > 0) {

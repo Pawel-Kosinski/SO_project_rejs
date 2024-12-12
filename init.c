@@ -32,12 +32,12 @@ void init_shared_memory() {
     shared_data->passengers_on_bridge = 0;
     shared_data->passengers_on_board = 0;
     shared_data->voyage_number = 0;
-    shared_data->bridge_empty = 0;
+    shared_data->loading_finished = 0;
     
 }
 
 int create_semaphore(key_t key) {
-    semid = semget(key, 4, 0600 | IPC_CREAT);
+    semid = semget(key, 2, 0600 | IPC_CREAT);
     if (semid == -1) {
         perror("semget");
         exit(EXIT_FAILURE);
