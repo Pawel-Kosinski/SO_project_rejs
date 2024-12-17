@@ -23,7 +23,7 @@
 #define K 15   // Maksymalna liczba pasazerow na mostku
 #define T1 50     // Czas miedzy rejsami
 #define T2 20    // Czas trwania rejsu
-#define R 2     // Maksymalna liczba rejsow
+#define R 1     // Maksymalna liczba rejsow
 #define NUM_PASSENGERS 40 // Liczba pasazerow  
 #define BRIDGE_SEM 0
 #define SHIP_SEM   1

@@ -36,7 +36,8 @@ void init_shared_memory() {
     
 }
 
-int create_semaphore(key_t key) {
+void create_semaphore(key_t key) {
+
     semid = semget(key, 2, 0600 | IPC_CREAT);
     if (semid == -1) {
         perror("semget");
@@ -51,22 +52,6 @@ int create_semaphore(key_t key) {
         perror("semctl SETALL");
         exit(EXIT_FAILURE);
     }
-    return semid;
-}
-
-int main() {
-    printf("Inicjalizacja zasobow. \n");
-
-    init_shared_memory();
-
-    key_t key_s = ftok("rejs", 'S');
-    if (key_s == -1) {
-        perror("ftok key_s");
-        exit(EXIT_FAILURE);
-    }
-
-    semid = create_semaphore(key_s);
-
     key_t msg_key = ftok("rejs", 'M');
     if (msg_key == -1) {
         perror("ftok msg_key");
@@ -93,6 +78,16 @@ int main() {
         exit(EXIT_FAILURE);
     }
     pthread_mutexattr_destroy(&mutex_attr);
+    
+}
+
+int main() {
+    printf("Inicjalizacja zasobow. \n");
+
+    init_shared_memory();
+
+
+    
 
     // Inicjalizacja zmiennej warunkowej
     /*pthread_condattr_t cond_boarding_attr;
