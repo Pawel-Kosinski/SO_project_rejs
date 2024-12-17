@@ -43,7 +43,7 @@ int create_semaphore(key_t key) {
         exit(EXIT_FAILURE);
     }
 
-    unsigned short initial_values[4] = {K, N, 0, 0}; //BRIDGE_SEM=K, SHIP_SEM=N, BOARDING_SEM=0, UNLOADING_SEM=0
+    unsigned short initial_values[2] = {K, N}; 
 
     union semun arg;
     arg.array = initial_values;

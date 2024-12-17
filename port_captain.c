@@ -141,7 +141,7 @@ int main() {
             }
             
             printf("Kapitan Portu: Wyslano komunikat do pasazerow o rozpoczeciu rozladunku.\n");
-                    pthread_mutex_lock(&shared_data->mutex);
+            pthread_mutex_lock(&shared_data->mutex);
             if (shared_data->voyage_number >= R) {
                 pthread_mutex_unlock(&shared_data->mutex);
                 printf("Kapitan Portu: Osiagnieto maksymalna liczbe rejsow. Koncze prace.\n");
@@ -149,6 +149,10 @@ int main() {
             }
             pthread_mutex_unlock(&shared_data->mutex);
         }
+            else if (msg.mtype == MSG_TYPE_TERMINATE) {
+                printf("Kapitan Statku: koncze przedwczesnie");
+                break;
+            }
     }
 
     // Odłączenie pamięci współdzielonej

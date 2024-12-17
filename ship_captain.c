@@ -63,8 +63,28 @@ void alarm_handler(int sig) {
     pthread_mutex_unlock(&shared_data->mutex);
 }
 
+void handle_sighup(int sig) {
+    pthread_mutex_lock(&shared_data->mutex);
+    printf("SIGHUP received: Przerywam rejsy na dany dzień.\n");
+    shared_data->voyage_number = R; 
+    shared_data->terminate = 1;
+    pthread_mutex_unlock(&shared_data->mutex);
+    send_message(MSG_TYPE_TERMINATE, "Start boarding");
+}
+
 int main() {
     signal(SIGALRM, alarm_handler);
+
+    struct sigaction sa;
+    sa.sa_handler = handle_sighup;
+    sa.sa_flags = SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+
+    if (sigaction(SIGHUP, &sa, NULL) == -1) {
+    perror("sigaction");
+    exit(EXIT_FAILURE);
+    }
+
     key_t shm_key = ftok("rejs", 'R');
     if (shm_key == -1) {
         perror("ftok shm_key");
@@ -108,8 +128,9 @@ int main() {
     }
 
     printf("Kapitan Statku: Rozpoczynam prace.\n");
-    for (int voyages = 1; voyages <= R; voyages++) {
-
+    int voyages = 0;
+    while(voyages < R && !shared_data->terminate){
+        voyages++;
         pthread_mutex_lock(&shared_data->mutex);
         shared_data->voyage_number = voyages;
         pthread_mutex_unlock(&shared_data->mutex);
