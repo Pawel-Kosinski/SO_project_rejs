@@ -151,9 +151,18 @@ int main() {
             perror("pthread_create");
             exit(EXIT_FAILURE);
         }
-    sleep(1);
+        sleep(1);
+        pthread_mutex_lock(&shared_data->mutex);
+        shared_data->passengers++;
+        if (shared_data->terminate == 1) {
+            pthread_mutex_unlock(&shared_data->mutex);
+            printf("Koncze tworzenie pasazerow \n");
+            break;
+        }
+        pthread_mutex_unlock(&shared_data->mutex);
     }
-    for (int i = 0; i < NUM_PASSENGERS; i++) {
+    int n = shared_data->passengers;
+    for (int i = 0; i < n; i++) {
         pthread_join(threads[i], NULL);
     }
 
@@ -178,8 +187,12 @@ void *Passenger(void* args) {
             if (shared_data->boarding_allowed == 1) {
                 pthread_mutex_unlock(&shared_data->mutex);
                 break;
-            } else {
-                //printf("Pasazer %d: Czeka na sygnal rozpoczecia zaladunku .\n", passenger_id);
+            }
+            else if (shared_data->voyage_number > R) {
+            pthread_mutex_unlock(&shared_data->mutex);
+            break;
+            }
+            else {
                 pthread_mutex_unlock(&shared_data->mutex);
                 sleep(1);
             }
@@ -190,7 +203,6 @@ void *Passenger(void* args) {
         if (shared_data->loading == 1) {
             if (shared_data->passengers_on_board < N) {
                 shared_data->passengers_on_board++;
-                //pthread_mutex_unlock(&shared_data->mutex);
                 enter_ship(passenger_id, semid, shared_data);
 
                 struct msgbuf msg;    
@@ -198,21 +210,29 @@ void *Passenger(void* args) {
                     perror("msgrcv unloading_allowed");
                     pthread_exit(NULL);
                 }
-
-                exit_ship(passenger_id, semid, shared_data);
-                
-                while(1) {
-                    pthread_mutex_lock(&shared_data->mutex);
-                    if (shared_data->loading == 2) {
-                        pthread_mutex_unlock(&shared_data->mutex);
-                        enter_bridge(passenger_id, semid, shared_data);
-                        break;
-                    } else {
-                        pthread_mutex_unlock(&shared_data->mutex);
-                        sleep(1);
+                if (strcmp(msg.mtext, "Unloading is now allowed.") == 0) {
+                    exit_ship(passenger_id, semid, shared_data);
+                    
+                    while(1) {
+                        pthread_mutex_lock(&shared_data->mutex);
+                        if (shared_data->loading == 2) {
+                            pthread_mutex_unlock(&shared_data->mutex);
+                            enter_bridge(passenger_id, semid, shared_data);
+                            break;
+                        } else {
+                            pthread_mutex_unlock(&shared_data->mutex);
+                            sleep(1);
+                        }
                     }
+                    exit_bridge(passenger_id, semid, shared_data);
                 }
-                exit_bridge(passenger_id, semid, shared_data);  
+                else if (strcmp(msg.mtext, "Abort voyages") == 0) {
+                    printf("Pasazer %d otrzymal sygnal o przedwczesnym zakonczeniu rejsow. \n", passenger_id);
+                    exit_ship(passenger_id, semid, shared_data);
+                    enter_bridge(passenger_id, semid, shared_data);
+                    exit_bridge(passenger_id, semid, shared_data);
+                    break;
+                }
             }
             else {
                 if (shared_data->loading_finished = 1) {

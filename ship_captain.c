@@ -55,35 +55,15 @@ void send_message(long mtype, const char *text) {
 
 void alarm_handler(int sig) {
     pthread_mutex_lock(&shared_data->mutex);
-    if (shared_data->loading_finished == 0) {
+    if (shared_data->loading_finished == 0 && shared_data->terminate != 1) {
         printf("Kapitan Statku: Czas na zaladunek uplynal. \n");
         shared_data->loading_finished = 1;
-        pthread_mutex_unlock(&shared_data->mutex);
     }
     pthread_mutex_unlock(&shared_data->mutex);
-}
-
-void handle_sighup(int sig) {
-    pthread_mutex_lock(&shared_data->mutex);
-    printf("SIGHUP received: Przerywam rejsy na dany dzień.\n");
-    shared_data->voyage_number = R; 
-    shared_data->terminate = 1;
-    pthread_mutex_unlock(&shared_data->mutex);
-    send_message(MSG_TYPE_TERMINATE, "Start boarding");
 }
 
 int main() {
     signal(SIGALRM, alarm_handler);
-
-    struct sigaction sa;
-    sa.sa_handler = handle_sighup;
-    sa.sa_flags = SA_RESTART;
-    sigemptyset(&sa.sa_mask);
-
-    if (sigaction(SIGHUP, &sa, NULL) == -1) {
-    perror("sigaction");
-    exit(EXIT_FAILURE);
-    }
 
     key_t shm_key = ftok("rejs", 'R');
     if (shm_key == -1) {
@@ -141,7 +121,6 @@ int main() {
         pthread_mutex_unlock(&shared_data->mutex);
         printf("Kapitan Statku: Rozpoczecie zaladunku do rejsu %d. \n", voyages);
         send_message(MSG_TYPE_START_BOARDING, "Start boarding");
-
         alarm(T1);
         pthread_mutex_lock(&shared_data->mutex);
         while(shared_data->loading_finished == 0){
@@ -150,47 +129,52 @@ int main() {
                 shared_data->loading_finished = 1;
                 pthread_mutex_unlock(&shared_data->mutex);
             }
+            else if (shared_data->terminate == 1) {
+                pthread_mutex_unlock(&shared_data->mutex);
+                printf("Kapitan Statku: Otrzymano sygnal o zakonczeniu rejsow.\n");
+                break;
+            }
             else {
                 pthread_mutex_unlock(&shared_data->mutex);
                 sleep(1);
             }
         }
-
-        pthread_mutex_lock(&shared_data->mutex);
         shared_data->boarding_allowed = 0; 
-        shared_data->loading = 0;
-        pthread_mutex_unlock(&shared_data->mutex);
-        //printf("Kapitan Statku: Zaladunek zakonczony dla rejsu %d. \n", voyages);
-        
-        pthread_mutex_lock(&shared_data->mutex);
-        if (shared_data->passengers_on_bridge > 0) {
-            pthread_mutex_unlock(&shared_data->mutex);
-            printf("Kapitan Statku: Czekam, az pasazerowie opuszcza mostek. \n");
 
-            while(1) {
-                pthread_mutex_lock(&shared_data->mutex);
-                if (shared_data->passengers_on_bridge == 0) {
-                    pthread_mutex_unlock(&shared_data->mutex);
-                    break;
-                }
+        if (shared_data->terminate != 1) {
+            pthread_mutex_lock(&shared_data->mutex);
+            shared_data->loading = 0;
+            pthread_mutex_unlock(&shared_data->mutex);
+            //printf("Kapitan Statku: Zaladunek zakonczony dla rejsu %d. \n", voyages);
+            
+            pthread_mutex_lock(&shared_data->mutex);
+            if (shared_data->passengers_on_bridge > 0) {
                 pthread_mutex_unlock(&shared_data->mutex);
-                sleep(1);
+                printf("Kapitan Statku: Czekam, az pasazerowie opuszcza mostek. \n");
+
+                while(1) {
+                    pthread_mutex_lock(&shared_data->mutex);
+                    if (shared_data->passengers_on_bridge == 0) {
+                        pthread_mutex_unlock(&shared_data->mutex);
+                        break;
+                    }
+                    pthread_mutex_unlock(&shared_data->mutex);
+                    sleep(1);
+                }
             }
-        }
-        else {
+            else {
+                pthread_mutex_unlock(&shared_data->mutex);
+            }
+
+            printf("Kapitan Statku: Rejs %d w trakcie.\n", voyages);
+            sleep(T2);
+
+            printf("Kapitan Statku: Rejs %d zakonczony. Pasazerowie moga opuscic statek. \n", voyages);
+            pthread_mutex_lock(&shared_data->mutex);
+            shared_data->loading = 2;
             pthread_mutex_unlock(&shared_data->mutex);
+            send_message(MSG_TYPE_START_UNLOADING, "Start unloading");
         }
-
-        printf("Kapitan Statku: Rejs %d w trakcie.\n", voyages);
-        sleep(T2);
-
-        printf("Kapitan Statku: Rejs %d zakonczony. Pasazerowie moga opuscic statek. \n", voyages);
-        pthread_mutex_lock(&shared_data->mutex);
-        shared_data->loading = 2;
-        pthread_mutex_unlock(&shared_data->mutex);
-
-        send_message(MSG_TYPE_START_UNLOADING, "Start unloading");
-
         while (1) {
             pthread_mutex_lock(&shared_data->mutex);
             if (shared_data->passengers_on_board == 0) {
@@ -220,8 +204,12 @@ int main() {
 
 
     }
-    printf("Kapitan Statku: Wykonano maksymalna liczbe rejsow (%d). Koncze prace. \n", R);
-        if (shmdt(shared_data) == -1) {
+    printf("Kapitan Statku: Koncze prace. \n");
+    voyages++;
+    pthread_mutex_lock(&shared_data->mutex);
+    shared_data->voyage_number = voyages;
+    pthread_mutex_unlock(&shared_data->mutex);
+    if (shmdt(shared_data) == -1) {
         perror("shmdt");
     }
     return 0;

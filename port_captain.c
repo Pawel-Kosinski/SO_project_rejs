@@ -119,66 +119,55 @@ void sem_v(int semid, unsigned short semnum) {
 void handle_sighup(int sig) {
     pthread_mutex_lock(&shared_data->mutex);
     if (shared_data->loading == 1) {
-        printf("Kapitan Portu: Zakanczam przedwczesnie zaladunek");
+        printf("Kapitan Portu: Zakanczam przedwczesnie zaladunek. \n");
         shared_data->loading_finished = 1;
         
     }
     pthread_mutex_unlock(&shared_data->mutex);
 }
 
+void handle_sigabrt(int sig) {
+    pthread_mutex_lock(&shared_data->mutex);
+    printf("SIGABRT received: Przerywam rejsy na dany dzień.\n");
+    shared_data->voyage_number = R; 
+    shared_data->terminate = 1;
+    //int n = shared_data->passengers;
+    pthread_mutex_unlock(&shared_data->mutex);
+    struct msgbuf terminate_msg;
+    terminate_msg.mtype = MSG_TYPE_UNLOADING_ALLOWED;
+    strncpy(terminate_msg.mtext, "Abort voyages", sizeof(terminate_msg.mtext) - 1);
+    terminate_msg.mtext[sizeof(terminate_msg.mtext) - 1] = '\0';
+
+    for (int i = 0; i < NUM_PASSENGERS; i++) {
+        if (msgsnd(msgid, &terminate_msg, sizeof(terminate_msg.mtext), 0) == -1) {
+            perror("msgsnd unloading_allowed");
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
 int main() {
     init_shared_memory();
     create_semaphore();
     //signal(SIGINT, handle_sigint);
-    struct sigaction sa;
-    sa.sa_handler = handle_sighup;
-    sa.sa_flags = SA_RESTART; 
-    sigemptyset(&sa.sa_mask);
-    if (sigaction(SIGHUP, &sa, NULL) == -1) {
+    struct sigaction sh;
+    sh.sa_handler = handle_sighup;
+    sh.sa_flags = SA_RESTART; 
+    sigemptyset(&sh.sa_mask);
+    if (sigaction(SIGHUP, &sh, NULL) == -1) {
         perror("sighup");
         exit(EXIT_FAILURE);
     }
-    /*key_t shm_key = ftok("rejs", 'R');
-    if (shm_key == -1) {
-        perror("ftok shm_key");
-        exit(EXIT_FAILURE);
-    }
 
-    shm_id = shmget(shm_key, sizeof(SharedData), 0600);
-    if (shm_id < 0) {
-        perror("shmget");
-        exit(EXIT_FAILURE);
-    }
+    struct sigaction sa;
+    sa.sa_handler = handle_sigabrt;
+    sa.sa_flags = SA_RESTART;
+    sigemptyset(&sa.sa_mask);
 
-    shared_data = (SharedData *)shmat(shm_id, NULL, 0);
-    if (shared_data == (SharedData *)-1) {
-        perror("shmat");
-        exit(EXIT_FAILURE);
+    if (sigaction(SIGABRT, &sa, NULL) == -1) {
+    perror("sigaction");
+    exit(EXIT_FAILURE);
     }
-
-    key_t sem_key = ftok("rejs", 'S');
-    if (sem_key == -1) {
-        perror("ftok sem_key");
-        exit(EXIT_FAILURE);
-    }
-
-    semid = semget(sem_key, 2, 0600);
-    if (semid == -1) {
-        perror("semget");
-        exit(EXIT_FAILURE);
-    }
-
-    key_t msg_key = ftok("rejs", 'M');
-    if (msg_key == -1) {
-        perror("ftok msg_key");
-        exit(EXIT_FAILURE);
-    }
-
-    msgid = msgget(msg_key, 0600);
-    if (msgid == -1) {
-        perror("msgget");
-        exit(EXIT_FAILURE);
-    }*/
 
     printf("Kapitan Portu: Rozpoczynam prace.\n");
 
@@ -195,9 +184,6 @@ int main() {
                 exit(EXIT_FAILURE);
             }
         }
-
-
-        
         if (msg.mtype == MSG_TYPE_START_BOARDING) {
             printf("Kapitan Portu: Otrzymano sygnal rozpoczecia zaladunku.\n");
             usleep((rand() % 2000 + 2000) * 1000);
@@ -231,10 +217,6 @@ int main() {
             }
             pthread_mutex_unlock(&shared_data->mutex);
         }
-            else if (msg.mtype == MSG_TYPE_TERMINATE) {
-                printf("Kapitan Statku: koncze przedwczesnie");
-                break;
-            }
     }
 
     while (1) {
