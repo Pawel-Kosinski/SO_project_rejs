@@ -119,20 +119,19 @@ void sem_v(int semid, unsigned short semnum) {
 void handle_sighup(int sig) {
     pthread_mutex_lock(&shared_data->mutex);
     if (shared_data->loading == 1) {
-        printf("Kapitan Portu: Zakanczam przedwczesnie zaladunek. \n");
+        printf(RED "Kapitan Portu: Zakanczam przedwczesnie zaladunek. \n" RESET);
         shared_data->loading_finished = 1;
-        
     }
     pthread_mutex_unlock(&shared_data->mutex);
 }
 
 void handle_sigabrt(int sig) {
     pthread_mutex_lock(&shared_data->mutex);
-    printf("SIGABRT received: Przerywam rejsy na dany dzień.\n");
+    printf(RED "SIGABRT received: Przerywam rejsy na dany dzień.\n" RESET);
     shared_data->voyage_number = R; 
     shared_data->terminate = 1;
-    //int n = shared_data->passengers;
     pthread_mutex_unlock(&shared_data->mutex);
+
     struct msgbuf terminate_msg;
     terminate_msg.mtype = MSG_TYPE_UNLOADING_ALLOWED;
     strncpy(terminate_msg.mtext, "Abort voyages", sizeof(terminate_msg.mtext) - 1);
@@ -149,7 +148,7 @@ void handle_sigabrt(int sig) {
 int main() {
     init_shared_memory();
     create_semaphore();
-    //signal(SIGINT, handle_sigint);
+
     struct sigaction sh;
     sh.sa_handler = handle_sighup;
     sh.sa_flags = SA_RESTART; 
@@ -165,36 +164,35 @@ int main() {
     sigemptyset(&sa.sa_mask);
 
     if (sigaction(SIGABRT, &sa, NULL) == -1) {
-    perror("sigaction");
-    exit(EXIT_FAILURE);
+        perror("sigaction");
+        exit(EXIT_FAILURE);
     }
 
-    printf("Kapitan Portu: Rozpoczynam prace.\n");
+    printf(RED "Kapitan Portu: Rozpoczynam prace.\n" RESET);
 
     while (1) {
         struct msgbuf msg;
         msg_r = msgrcv(msgid, &msg, sizeof(msg.mtext), 0, 0);
-        if (msg_r== -1) {
+        if (msg_r == -1) {
             if (errno == EINTR) {
-                printf("msgrcv przerwane przez sygnal, ponawiam...\n");
+                printf(RED "msgrcv przerwane przez sygnal, ponawiam...\n" RESET);
                 continue;
-            }
-            else {
+            } else {
                 perror("msgrcv");
                 exit(EXIT_FAILURE);
             }
         }
         if (msg.mtype == MSG_TYPE_START_BOARDING) {
-            printf("Kapitan Portu: Otrzymano sygnal rozpoczecia zaladunku.\n");
+            printf(RED "Kapitan Portu: Otrzymano sygnal rozpoczecia zaladunku.\n" RESET);
             usleep((rand() % 2000 + 2000) * 1000);
             
             pthread_mutex_lock(&shared_data->mutex);
             shared_data->boarding_allowed = 1;
             pthread_mutex_unlock(&shared_data->mutex);
-            printf("Kapitan Portu: Wyslano komunikat do pasazerow o rozpoczeciu zaladunku.\n");
+            printf(RED "Kapitan Portu: Wyslano komunikat do pasazerow o rozpoczeciu zaladunku.\n" RESET);
 
         } else if (msg.mtype == MSG_TYPE_START_UNLOADING) {
-            printf("Kapitan Portu: Otrzymano sygnal rozpoczecia rozladunku.\n");
+            printf(RED "Kapitan Portu: Otrzymano sygnal rozpoczecia rozladunku.\n" RESET);
             
             struct msgbuf unloading_msg;
             unloading_msg.mtype = MSG_TYPE_UNLOADING_ALLOWED;
@@ -208,11 +206,11 @@ int main() {
                 }
             }
             
-            printf("Kapitan Portu: Wyslano komunikat do pasazerow o rozpoczeciu rozladunku.\n");
+            printf(RED "Kapitan Portu: Wyslano komunikat do pasazerow o rozpoczeciu rozladunku.\n" RESET);
             pthread_mutex_lock(&shared_data->mutex);
             if (shared_data->voyage_number >= R) {
                 pthread_mutex_unlock(&shared_data->mutex);
-                printf("Kapitan Portu: Osiagnieto maksymalna liczbe rejsow. Koncze prace.\n");
+                printf(RED "Kapitan Portu: Osiagnieto maksymalna liczbe rejsow. Koncze prace.\n" RESET);
                 break;
             }
             pthread_mutex_unlock(&shared_data->mutex);
@@ -231,7 +229,7 @@ int main() {
         perror("shmdt");
     }
 
-    printf("Rozpoczynanie procesu czyszczenia zasobow IPC.\n");
+    printf(RED "Rozpoczynanie procesu czyszczenia zasobow IPC.\n" RESET);
 
     FILE *file = fopen("rejs", "R");
     if (file == NULL) {

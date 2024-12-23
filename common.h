@@ -65,5 +65,9 @@ extern int shm_id;
 extern int semid;
 extern int msgid;
 
+#define RESET   "\033[0m"
+#define GREEN   "\033[32m"
+#define RED     "\033[31m"
+#define BLUE    "\033[34m" //kolorowanie wyjscia
 
 #endif // COMMON_H
