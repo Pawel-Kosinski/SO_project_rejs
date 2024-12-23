@@ -134,7 +134,7 @@ int main() {
                 break;
             } else {
                 pthread_mutex_unlock(&shared_data->mutex);
-                sleep(1);
+                //sleep(1);
             }
         }
         shared_data->boarding_allowed = 0;
