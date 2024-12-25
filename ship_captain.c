@@ -46,10 +46,14 @@ void send_message(long mtype, const char *text) {
     msg.mtype = mtype;
     strncpy(msg.mtext, text, sizeof(msg.mtext) - 1);
     msg.mtext[sizeof(msg.mtext) - 1] = '\0';
-
-    if (msgsnd(msgid, &msg, sizeof(msg.mtext), 0) == -1) {
-        perror("msgsnd");
-        exit(EXIT_FAILURE);
+    int ret;
+    while ((ret = msgsnd(msgid, &msg, sizeof(msg.mtext), 0)) == -1) {
+        if (errno == EINTR) {
+            continue;
+        } else {
+            perror("msgsnd");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -134,7 +138,7 @@ int main() {
                 break;
             } else {
                 pthread_mutex_unlock(&shared_data->mutex);
-                //sleep(1);
+                sleep(1);
             }
         }
         shared_data->boarding_allowed = 0;
@@ -163,13 +167,12 @@ int main() {
 
             printf(BLUE "Kapitan Statku: Rejs %d w trakcie.\n" RESET, voyages);
             sleep(T2);
-
             printf(BLUE "Kapitan Statku: Rejs %d zakonczony. Pasazerowie moga opuscic statek. \n" RESET, voyages);
-            pthread_mutex_lock(&shared_data->mutex);
-            shared_data->loading = 2;
-            pthread_mutex_unlock(&shared_data->mutex);
             send_message(MSG_TYPE_START_UNLOADING, "Start unloading");
         }
+        pthread_mutex_lock(&shared_data->mutex);
+        shared_data->loading = 2;
+        pthread_mutex_unlock(&shared_data->mutex);
         while (1) {
             pthread_mutex_lock(&shared_data->mutex);
             if (shared_data->passengers_on_board == 0) {

@@ -155,10 +155,14 @@ int main() {
         }
         pthread_mutex_unlock(&shared_data->mutex);
     }
-    int n = shared_data->passengers;
-    for (int i = 0; i < n; i++) {
+    //int n = shared_data->passengers;
+    for (int i = 0; i < shared_data->passengers; i++) {
         pthread_join(threads[i], NULL);
+        pthread_mutex_lock(&shared_data->mutex);
+        //printf(GREEN "Pozostało %d pasazerow\n" RESET, shared_data->passengers - i);
+        pthread_mutex_unlock(&shared_data->mutex);
     }
+    shared_data->passengers = 0;
 
     if (shmdt(shared_data) == -1) {
         perror("shmdt");
@@ -183,8 +187,9 @@ void *Passenger(void* args) {
                 break;
             }
             else if (shared_data->voyage_number > R) {
-            pthread_mutex_unlock(&shared_data->mutex);
-            break;
+                pthread_mutex_unlock(&shared_data->mutex);
+                printf(GREEN "Pasazer %d zakonczyl prace. \n" RESET, passenger_id);
+                pthread_exit(NULL);
             }
             else {
                 pthread_mutex_unlock(&shared_data->mutex);

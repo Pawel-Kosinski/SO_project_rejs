@@ -126,12 +126,24 @@ void handle_sighup(int sig) {
 }
 
 void handle_sigabrt(int sig) {
-    pthread_mutex_lock(&shared_data->mutex);
     printf(RED "SIGABRT received: Przerywam rejsy na dany dzień.\n" RESET);
-    shared_data->voyage_number = R; 
+    while (1) {
+        pthread_mutex_lock(&shared_data->mutex);
+        if (shared_data->loading == 0) {
+            sleep(1);
+        }
+        else {
+            pthread_mutex_unlock(&shared_data->mutex);
+            break;
+        }
+        pthread_mutex_unlock(&shared_data->mutex);
+    }
+    pthread_mutex_lock(&shared_data->mutex);
+    shared_data->voyage_number = R + 1; 
     shared_data->terminate = 1;
+    shared_data->loading = 2;
+    shared_data->boarding_allowed = 0;
     pthread_mutex_unlock(&shared_data->mutex);
-
     struct msgbuf terminate_msg;
     terminate_msg.mtype = MSG_TYPE_UNLOADING_ALLOWED;
     strncpy(terminate_msg.mtext, "Abort voyages", sizeof(terminate_msg.mtext) - 1);
@@ -139,7 +151,7 @@ void handle_sigabrt(int sig) {
 
     for (int i = 0; i < NUM_PASSENGERS; i++) {
         if (msgsnd(msgid, &terminate_msg, sizeof(terminate_msg.mtext), 0) == -1) {
-            perror("msgsnd unloading_allowed");
+            perror("msgsnd terminated");
             exit(EXIT_FAILURE);
         }
     }
@@ -170,7 +182,7 @@ int main() {
 
     printf(RED "Kapitan Portu: Rozpoczynam prace.\n" RESET);
 
-    while (1) {
+    while (!shared_data->terminate) {
         struct msgbuf msg;
         msg_r = msgrcv(msgid, &msg, sizeof(msg.mtext), 0, 0);
         if (msg_r == -1) {
@@ -199,7 +211,7 @@ int main() {
             strncpy(unloading_msg.mtext, "Unloading is now allowed.", sizeof(unloading_msg.mtext) - 1);
             unloading_msg.mtext[sizeof(unloading_msg.mtext) - 1] = '\0';
 
-            for (int i = 0; i < NUM_PASSENGERS; i++) {
+            for (int i = 0; i < N; i++) {
                 if (msgsnd(msgid, &unloading_msg, sizeof(unloading_msg.mtext), 0) == -1) {
                     perror("msgsnd unloading_allowed");
                     exit(EXIT_FAILURE);
@@ -210,7 +222,7 @@ int main() {
             pthread_mutex_lock(&shared_data->mutex);
             if (shared_data->voyage_number >= R) {
                 pthread_mutex_unlock(&shared_data->mutex);
-                printf(RED "Kapitan Portu: Osiagnieto maksymalna liczbe rejsow. Koncze prace.\n" RESET);
+                printf(RED "Kapitan Portu: Osiagnieto maksymalna liczbe rejsow.\n" RESET);
                 break;
             }
             pthread_mutex_unlock(&shared_data->mutex);
@@ -218,7 +230,7 @@ int main() {
     }
 
     while (1) {
-        if (shared_data->loading != 0) {
+        if (shared_data->passengers != 0) {
             sleep(1);
         }
         else 
@@ -327,5 +339,6 @@ int main() {
     }
 
     printf("Proces czyszczenia zasobow IPC zakonczony.\n");
+    printf(RED "Kapitan Portu: Koncze prace.\n" RESET);
     return 0;
 }
