@@ -5,41 +5,6 @@ int shm_id;
 int semid;
 int msgid;
 
-void sem_p(int semid, unsigned short semnum) {
-    struct sembuf op;
-    op.sem_num = semnum;   
-    op.sem_op = -1;        
-    op.sem_flg = 0;        
-
-    int result = semop(semid, &op, 1);
-        if (result == -1) {
-            if(errno == EINTR){
-                semop(semid, &op, 1);
-            }
-            else {
-            perror("semop P");
-            exit(EXIT_FAILURE);
-            }
-    }
-}
-
-void sem_v(int semid, unsigned short semnum) {
-    struct sembuf op;
-    op.sem_num = semnum;   
-    op.sem_op = 1;        
-    op.sem_flg = 0;        
-
-    int result = semop(semid, &op, 1);
-        if (result == -1) {
-            if(errno == EINTR){
-                semop(semid, &op, 1);
-            }
-            else {
-            perror("semop P");
-            exit(EXIT_FAILURE);
-            }
-    }
-}
 
 void send_message(long mtype, const char *text) {
     struct msgbuf msg;
@@ -142,6 +107,7 @@ int main() {
             }
         }
         shared_data->boarding_allowed = 0;
+        shared_data->unloading_finished = shared_data->passengers_on_board;
 
         if (shared_data->terminate != 1) {
             pthread_mutex_lock(&shared_data->mutex);
@@ -164,7 +130,6 @@ int main() {
             } else {
                 pthread_mutex_unlock(&shared_data->mutex);
             }
-
             printf(BLUE "Kapitan Statku: Rejs %d w trakcie.\n" RESET, voyages);
             sleep(T2);
             printf(BLUE "Kapitan Statku: Rejs %d zakonczony. Pasazerowie moga opuscic statek. \n" RESET, voyages);
@@ -184,17 +149,16 @@ int main() {
             pthread_mutex_unlock(&shared_data->mutex);
             sleep(1);
         }
-        sleep(10);
         while (1) {
             pthread_mutex_lock(&shared_data->mutex);
-            if (shared_data->passengers_on_bridge == 0) {
+            if (shared_data->unloading_finished == 0) {
                 shared_data->loading = 0;
                 pthread_mutex_unlock(&shared_data->mutex);
                 printf(BLUE "Kapitan Statku: Wszyscy pasazerowie opuscili mostek.\n" RESET);
                 break;
             }
             pthread_mutex_unlock(&shared_data->mutex);
-            sleep(1);
+           sleep(1);
         }
 
         printf(BLUE "Kapitan Statku: Rozladunek zakonczony dla rejsu %d. \n" RESET, voyages);

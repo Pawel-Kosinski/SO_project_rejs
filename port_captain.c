@@ -34,7 +34,7 @@ void init_shared_memory() {
     shared_data->passengers_on_board = 0;
     shared_data->voyage_number = 0;
     shared_data->loading_finished = 0;
-    
+    shared_data->unloading_finished = 0;
 }
 
 void create_semaphore() {
@@ -87,34 +87,6 @@ void create_semaphore() {
     pthread_mutexattr_destroy(&mutex_attr);
     
 }
-// Definicja funkcji sem_p (P operation)
-void sem_p(int semid, unsigned short semnum) {
-    struct sembuf op;
-    op.sem_num = semnum;   // Indeks semafora w zestawie
-    op.sem_op = -1;        // P: dekrementacja o 1
-    op.sem_flg = 0;        // Brak dodatkowych flag
-
-    while (semop(semid, &op, 1) == -1) {
-        if (errno != EINTR) {
-            perror("semop P");
-            exit(EXIT_FAILURE);
-        }
-        // Jeśli przerwane przez sygnał, powtórz operację
-    }
-}
-
-// Definicja funkcji sem_v (V operation)
-void sem_v(int semid, unsigned short semnum) {
-    struct sembuf op;
-    op.sem_num = semnum;   // Indeks semafora w zestawie
-    op.sem_op = 1;         // V: inkrementacja o 1
-    op.sem_flg = 0;        // Brak dodatkowych flag
-
-    if (semop(semid, &op, 1) == -1) {
-        perror("semop V");
-        exit(EXIT_FAILURE);
-    }
-}
 
 void handle_sighup(int sig) {
     pthread_mutex_lock(&shared_data->mutex);
@@ -149,7 +121,7 @@ void handle_sigabrt(int sig) {
     strncpy(terminate_msg.mtext, "Abort voyages", sizeof(terminate_msg.mtext) - 1);
     terminate_msg.mtext[sizeof(terminate_msg.mtext) - 1] = '\0';
 
-    for (int i = 0; i < NUM_PASSENGERS; i++) {
+    for (int i = 0; i < N; i++) {
         if (msgsnd(msgid, &terminate_msg, sizeof(terminate_msg.mtext), 0) == -1) {
             perror("msgsnd terminated");
             exit(EXIT_FAILURE);

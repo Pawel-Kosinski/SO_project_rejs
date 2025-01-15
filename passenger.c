@@ -163,7 +163,7 @@ int main() {
         pthread_mutex_unlock(&shared_data->mutex);
     }
     shared_data->passengers = 0;
-
+    printf(GREEN "Pozostało %d pasazerow\n" RESET, shared_data->passengers);
     if (shmdt(shared_data) == -1) {
         perror("shmdt");
     }
@@ -224,12 +224,18 @@ void *Passenger(void* args) {
                         }
                     }
                     exit_bridge(passenger_id, semid, shared_data);
+                    pthread_mutex_lock(&shared_data->mutex);
+                    shared_data->unloading_finished--;
+                    pthread_mutex_unlock(&shared_data->mutex);
                 }
                 else if (strcmp(msg.mtext, "Abort voyages") == 0) {
                     printf(GREEN "Pasazer %d otrzymal sygnal o przedwczesnym zakonczeniu rejsow. \n" RESET, passenger_id);
                     exit_ship(passenger_id, semid, shared_data);
                     enter_bridge(passenger_id, semid, shared_data);
                     exit_bridge(passenger_id, semid, shared_data);
+                    pthread_mutex_lock(&shared_data->mutex);
+                    shared_data->unloading_finished--;
+                    pthread_mutex_unlock(&shared_data->mutex);
                     break;
                 }
             }
