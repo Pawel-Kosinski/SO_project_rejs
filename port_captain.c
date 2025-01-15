@@ -100,9 +100,7 @@ void handle_sighup(int sig) {
 void handle_sigabrt(int sig) {
     printf(RED "SIGABRT received: Przerywam rejsy na dany dzień.\n" RESET);
     while (1) {
-        pthread_mutex_lock(&shared_data->mutex);
         if (shared_data->loading == 0) {
-            pthread_mutex_unlock(&shared_data->mutex);
             sleep(1);
         }
         else {
