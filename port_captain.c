@@ -102,13 +102,13 @@ void handle_sigabrt(int sig) {
     while (1) {
         pthread_mutex_lock(&shared_data->mutex);
         if (shared_data->loading == 0) {
+            pthread_mutex_unlock(&shared_data->mutex);
             sleep(1);
         }
         else {
             pthread_mutex_unlock(&shared_data->mutex);
             break;
         }
-        pthread_mutex_unlock(&shared_data->mutex);
     }
     pthread_mutex_lock(&shared_data->mutex);
     shared_data->voyage_number = R + 1; 
