@@ -1,96 +1,10 @@
 #include "PortCaptain.hpp"
+#include "IPCManager.hpp"
 
 SharedData *shared_data = nullptr;
 int shm_id = -1;
 int semid = -1;
 int msgid = -1;
-
-void cleanup_resources();
-
-void init_shared_memory() {
-    key_t key = ftok("rejs", 'R');
-    if (key == -1) {
-        perror("ftok");
-        exit(EXIT_FAILURE);
-    }
-
-    shm_id = shmget(key, sizeof(SharedData), IPC_CREAT | 0600);
-    if (shm_id < 0) {
-        perror("shmget");
-        exit(EXIT_FAILURE);
-    }
-
-    void* ptr = shmat(shm_id, nullptr, 0);
-    if (ptr == (void*)-1) {
-        perror("shmat");
-        exit(EXIT_FAILURE);
-    }
-    shared_data = static_cast<SharedData*>(ptr);
-
-    // Inicjalizacja zmiennych
-    shared_data->loading = 0;
-    shared_data->boarding_allowed = 0;
-    shared_data->unloading_allowed = 0;
-    shared_data->passengers_on_bridge = 0;
-    shared_data->passengers_on_board = 0;
-    shared_data->voyage_number = 0;
-    shared_data->loading_finished = 0;
-    shared_data->unloading_finished = 0;
-    shared_data->passengers = 0;
-    shared_data->terminate = 0;
-}
-
-void create_ipc_objects() {
-    // 1. Semafory
-    key_t key_s = ftok("rejs", 'S');
-    if (key_s == -1) {
-        perror("ftok key_s");
-        exit(EXIT_FAILURE);
-    }
-
-    semid = semget(key_s, 2, 0600 | IPC_CREAT);
-    if (semid == -1) {
-        perror("semget");
-        exit(EXIT_FAILURE);
-    }
-
-    unsigned short initial_values[2] = {static_cast<unsigned short>(K), static_cast<unsigned short>(N)};
-    union semun arg;
-    arg.array = initial_values;
-    if (semctl(semid, 0, SETALL, arg) == -1) {
-        perror("semctl SETALL");
-        exit(EXIT_FAILURE);
-    }
-
-    // 2. Kolejka komunikatów
-    key_t key_m = ftok("rejs", 'M');
-    if (key_m == -1) {
-        perror("ftok msg_key");
-        exit(EXIT_FAILURE);
-    }
-
-    msgid = msgget(key_m, IPC_CREAT | 0600);
-    if (msgid == -1) {
-        perror("msgget");
-        exit(EXIT_FAILURE);
-    }
-
-    // 3. Mutex w pamięci współdzielonej (Process Shared)
-    pthread_mutexattr_t mutex_attr;
-    if (pthread_mutexattr_init(&mutex_attr) != 0) {
-        perror("pthread_mutexattr_init");
-        exit(EXIT_FAILURE);
-    }
-    if (pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED) != 0) {
-        perror("pthread_mutexattr_setpshared");
-        exit(EXIT_FAILURE);
-    }
-    if (pthread_mutex_init(&shared_data->mutex, &mutex_attr) != 0) {
-        perror("pthread_mutex_init");
-        exit(EXIT_FAILURE);
-    }
-    pthread_mutexattr_destroy(&mutex_attr);
-}
 
 void handle_sighup(int sig) {
     if (!shared_data) return;
@@ -137,8 +51,19 @@ void handle_sigabrt(int sig) {
 
 int main() {
     std::srand(std::time(nullptr));
-    init_shared_memory();
-    create_ipc_objects();
+    IPCManager ipc_manager;
+    ipc_manager.cleanup();
+
+    try {
+        ipc_manager.initialize(); 
+    } catch (const std::exception& e) {
+        std::cerr << "Błąd inicjalizacji IPC: " << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+    
+    semid = ipc_manager.getSemaphoreId();
+    msgid = ipc_manager.getMessageQueueId();
+    shared_data = ipc_manager.getSharedData();
 
     // Rejestracja sygnałów
     struct sigaction sa_hup;
@@ -186,56 +111,7 @@ int main() {
         }
     }
 
-    cleanup_resources();
+    ipc_manager.cleanup();
+    std::cout << RED << "Kapitan Portu: Koniec dnia, zamykam port.\n" << RESET;
     return 0;
-}
-
-void cleanup_resources() {
-    std::cout << RED << "Rozpoczynanie procesu czyszczenia zasobow IPC.\n" << RESET;
-
-    if (shmdt(shared_data) == -1) perror("shmdt");
-
-    // Utworzenie pliku jeśli nie istnieje (do ftok)
-    FILE *file = fopen("rejs", "r");
-    if (file == NULL) {
-        file = fopen("rejs", "w");
-        if (file) fclose(file);
-    } else {
-        fclose(file);
-    }
-
-    key_t shm_key = ftok("rejs", 'R');
-    if (shm_key != -1) {
-        int sid = shmget(shm_key, sizeof(SharedData), 0);
-        if (sid != -1) {
-            // Tymczasowe podłączenie, żeby zniszczyć mutex
-            SharedData *sd = (SharedData *)shmat(sid, NULL, 0);
-            if (sd != (SharedData *)-1) {
-                pthread_mutex_destroy(&sd->mutex);
-                shmdt(sd);
-            }
-            if (shmctl(sid, IPC_RMID, NULL) == -1) perror("shmctl IPC_RMID");
-            else std::cout << "Pamiec wspoldzielona usunieta.\n";
-        }
-    }
-
-    key_t sem_key = ftok("rejs", 'S');
-    if (sem_key != -1) {
-        int sid = semget(sem_key, 2, 0600);
-        if (sid != -1) {
-            if (semctl(sid, 0, IPC_RMID) == -1) perror("semctl IPC_RMID");
-            else std::cout << "Semafora usuniete.\n";
-        }
-    }
-
-    key_t msg_key = ftok("rejs", 'M');
-    if (msg_key != -1) {
-        int mid = msgget(msg_key, 0600);
-        if (mid != -1) {
-            if (msgctl(mid, IPC_RMID, NULL) == -1) perror("msgctl IPC_RMID");
-            else std::cout << "Kolejka komunikatow usunieta.\n";
-        }
-    }
-
-    std::cout << RED << "Kapitan Portu: Koncze prace.\n" << RESET;
 }
