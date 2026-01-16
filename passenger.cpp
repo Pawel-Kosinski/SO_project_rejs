@@ -1,5 +1,6 @@
 #include "common.hpp"
-#include "pas.hpp" // INCLUDE HPP, NIE CPP!
+#include "pas.hpp" 
+#include "IPCManager.hpp"
 
 SharedData *shared_data = nullptr;
 int shm_id;
@@ -33,9 +34,6 @@ void PassengerLogic(PassengerArgs args) {
             }
         } 
         else {
-            // PORAŻKA: tryToBoard zwróciło false (brak miejsca/czasu).
-            // Pasażer już zszedł z mostku (wewnątrz tryToBoard).
-            // Pętla while(true) leci od nowa -> passenger wraca do isBoardingAllowed.
             continue; 
         }
                 
@@ -52,15 +50,19 @@ void PassengerLogic(PassengerArgs args) {
 int main() {
     std::srand(std::time(nullptr) ^ getpid());
 
-    key_t shm_key = ftok("rejs", 'R');
-    shm_id = shmget(shm_key, sizeof(SharedData), 0600);
-    shared_data = static_cast<SharedData*>(shmat(shm_id, nullptr, 0));
+    IPCManager ipc_manager;
+    
+    try {
+        ipc_manager.attach();
+    } catch (const std::exception& e) {
+        std::cerr << "Błąd podłączenia IPC: " << e.what() << std::endl;
+        std::cerr << "Upewnij się, że port_captain jest uruchomiony!\n";
+        return EXIT_FAILURE;
+    }
 
-    key_t sem_key = ftok("rejs", 'S');
-    semid = semget(sem_key, 2, 0600);
-
-    key_t msg_key = ftok("rejs", 'M');
-    msgid = msgget(msg_key, 0600);
+    semid = ipc_manager.getSemaphoreId();
+    msgid = ipc_manager.getMessageQueueId();
+    shared_data = ipc_manager.getSharedData();
 
     std::vector<std::thread> threads;
     threads.reserve(NUM_PASSENGERS);

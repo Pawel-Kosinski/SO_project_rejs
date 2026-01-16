@@ -52,7 +52,6 @@ void handle_sigabrt(int sig) {
 int main() {
     std::srand(std::time(nullptr));
     IPCManager ipc_manager;
-    ipc_manager.cleanup();
 
     try {
         ipc_manager.initialize(); 

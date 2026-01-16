@@ -1,4 +1,5 @@
 #include "ShipCaptain.hpp"
+#include "IPCManager.hpp"
 
 SharedData *shared_data = nullptr;
 int shm_id = -1;
@@ -18,27 +19,19 @@ void alarmHandler(int sig) {
 int main() {
     signal(SIGALRM, alarmHandler);
 
-    // 1. Podłączenie SHM
-    key_t shm_key = ftok("rejs", 'R');
-    if (shm_key == -1) { perror("ftok shm"); exit(EXIT_FAILURE); }
-    shm_id = shmget(shm_key, sizeof(SharedData), 0600);
-    if (shm_id < 0) { perror("shmget"); exit(EXIT_FAILURE); }
+    IPCManager ipc_manager;
     
-    void* ptr = shmat(shm_id, nullptr, 0);
-    if (ptr == (void*)-1) { perror("shmat"); exit(EXIT_FAILURE); }
-    shared_data = static_cast<SharedData*>(ptr);
-
-    // 2. Podłączenie Sem
-    key_t sem_key = ftok("rejs", 'S');
-    if (sem_key == -1) { perror("ftok sem"); exit(EXIT_FAILURE); }
-    semid = semget(sem_key, 2, 0600);
-    if (semid == -1) { perror("semget"); exit(EXIT_FAILURE); }
-
-    // 3. Podłączenie Msg
-    key_t msg_key = ftok("rejs", 'M');
-    if (msg_key == -1) { perror("ftok msg"); exit(EXIT_FAILURE); }
-    msgid = msgget(msg_key, 0600);
-    if (msgid == -1) { perror("msgget"); exit(EXIT_FAILURE); }
+    try {
+        ipc_manager.attach();
+    } catch (const std::exception& e) {
+        std::cerr << "Błąd podłączenia IPC: " << e.what() << std::endl;
+        std::cerr << "Upewnij się, że port_captain jest uruchomiony!\n";
+        return EXIT_FAILURE;
+    }
+    
+    semid = ipc_manager.getSemaphoreId();
+    msgid = ipc_manager.getMessageQueueId();
+    shared_data = ipc_manager.getSharedData();
 
     std::cout << BLUE << "Kapitan Statku: Rozpoczynam prace.\n" << RESET;
     //int voyages = 0;
