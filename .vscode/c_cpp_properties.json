@@ -3,7 +3,8 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "/home/inf1s-23z/kosinski.pawel.151448/so/projekt/SO_project_rejs"
             ],
             "defines": [],
             "compilerPath": "/usr/local/bin/gcc",

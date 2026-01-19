@@ -1,70 +1,62 @@
-#include "PortCaptain.hpp"
 #include "IPCManager.hpp"
+#include "domain/PortCaptain.hpp"
+#include "infrastructure/ShipState.hpp"
+#include "infrastructure/MessageService.hpp"
+#include <memory>
 
-SharedData *shared_data = nullptr;
-int shm_id = -1;
-int semid = -1;
-int msgid = -1;
+// Globalny wskaźnik dla handlerów sygnałów
+std::shared_ptr<IPortCaptainShipControl> g_ship_control = nullptr;
+std::shared_ptr<IMessageService> g_messaging = nullptr;
 
 void handle_sighup(int sig) {
-    if (!shared_data) return;
-    pthread_mutex_lock(&shared_data->mutex);
-    if (shared_data->loading == 1) {
-        std::cout << RED << "Kapitan Portu: Zakanczam przedwczesnie zaladunek.\n" << RESET;
-        shared_data->loading_finished = 1;
-    }
-    pthread_mutex_unlock(&shared_data->mutex);
+    if (!g_ship_control) return;
+    std::cout << RED << "Kapitan Portu: SIGHUP - zakończam przedwcześnie załadunek.\n" << RESET;
+    g_ship_control->forceFinishBoarding();
 }
 
 void handle_sigabrt(int sig) {
+    if (!g_ship_control || !g_messaging) return;
+    
     std::cout << RED << "SIGABRT received: Przerywam rejsy na dany dzień.\n" << RESET;
     
-    // Czekaj aż statek nie będzie w trakcie normalnego załadunku (żeby nie przerwać w połowie mutexa w złym stanie)
-    while (true) {
-        pthread_mutex_lock(&shared_data->mutex);
-        if (shared_data->loading == 0) {
-             pthread_mutex_unlock(&shared_data->mutex);
-             sleep(1);
-        } else {
-            pthread_mutex_unlock(&shared_data->mutex);
-            break;
-        }
-    }
-
-    pthread_mutex_lock(&shared_data->mutex);
-    shared_data->voyage_number = R + 1;
-    shared_data->terminate = 1;
-    shared_data->loading = 2; // wymuszenie trybu rozładunku/koniec
-    shared_data->boarding_allowed = 0;
-    pthread_mutex_unlock(&shared_data->mutex);
-
-    struct msgbuf_custom terminate_msg;
-    terminate_msg.mtype = MSG_TYPE_UNLOADING_ALLOWED;
-    std::strncpy(terminate_msg.mtext, "Abort voyages", sizeof(terminate_msg.mtext) - 1);
-    terminate_msg.mtext[sizeof(terminate_msg.mtext) - 1] = '\0';
-
-    // Wysłanie wiadomości do pasażerów
-    for (int i = 0; i < N; i++) {
-        msgsnd(msgid, &terminate_msg, sizeof(terminate_msg.mtext), 0);
-    }
+    // Zainicjuj awaryjne zatrzymanie
+    g_ship_control->initiateEmergencyStop();
+    
+    // Wyślij komunikaty abort do pasażerów
+    g_messaging->sendAbortMessages(N);
 }
 
 int main() {
     std::srand(std::time(nullptr));
+    
     IPCManager ipc_manager;
-
+    
     try {
-        ipc_manager.initialize(); 
+        ipc_manager.initialize();
     } catch (const std::exception& e) {
         std::cerr << "Błąd inicjalizacji IPC: " << e.what() << std::endl;
         return EXIT_FAILURE;
     }
     
-    semid = ipc_manager.getSemaphoreId();
-    msgid = ipc_manager.getMessageQueueId();
-    shared_data = ipc_manager.getSharedData();
-
-    // Rejestracja sygnałów
+    // ========== 2. Stwórz infrastrukturę (adaptery) ==========
+    auto ship_state = std::make_shared<ShipState>(
+        ipc_manager.getSemaphoreId(),
+        ipc_manager.getSharedData()
+    );
+    
+    auto messaging = std::make_shared<MessageService>(
+        ipc_manager.getMessageQueueId(),
+        ipc_manager.getSharedData()
+    );
+    
+    // ========== 3. Rzutuj na interfejs kapitana portu ==========
+    std::shared_ptr<IPortCaptainShipControl> port_ship_control = ship_state;
+    
+    // Ustaw globalne wskaźniki dla handlerów sygnałów
+    g_ship_control = port_ship_control;
+    g_messaging = messaging;
+    
+    // ========== 4. Rejestracja sygnałów ==========
     struct sigaction sa_hup;
     sa_hup.sa_handler = handle_sighup;
     sa_hup.sa_flags = SA_RESTART;
@@ -73,7 +65,7 @@ int main() {
         perror("sigaction SIGHUP");
         exit(EXIT_FAILURE);
     }
-
+    
     struct sigaction sa_abrt;
     sa_abrt.sa_handler = handle_sigabrt;
     sa_abrt.sa_flags = SA_RESTART;
@@ -82,35 +74,25 @@ int main() {
         perror("sigaction SIGABRT");
         exit(EXIT_FAILURE);
     }
-
-    PortCaptain port_captain(semid, msgid, shared_data);
-    std::cout << RED << "Kapitan Portu: Rozpoczynam prace.\n" << RESET;
-
-    while (!shared_data->terminate and !port_captain.voyages_ended) {
-        struct msgbuf_custom msg = port_captain.waitForMessage();
-
-        if (msg.mtype == MSG_TYPE_START_BOARDING) {
-            port_captain.startBoarding();
-        } else if (msg.mtype == MSG_TYPE_START_UNLOADING) {
-            port_captain.startUnloading();
-            port_captain.endVoyages();
-        }
-    }
-
-    // Czekanie na zakończenie wszystkich pasażerów
+    
+    // ========== 5. Uruchom logikę Kapitana Portu ==========
+    PortCaptain port_captain(port_ship_control, messaging);
+    port_captain.run();
+    
+    // ========== 6. Poczekaj aż wszystkie procesy się zakończą ==========
+    SharedData* shared_data = ipc_manager.getSharedData();
     while (true) {
         pthread_mutex_lock(&shared_data->mutex);
         int p = shared_data->passengers;
         pthread_mutex_unlock(&shared_data->mutex);
         
-        if (p != 0) {
-            sleep(1);
-        } else {
-            break;
-        }
+        if (p == 0) break;
+        sleep(1);
     }
-
+    
+    // ========== 7. Cleanup zasobów ==========
     ipc_manager.cleanup();
+    
     std::cout << RED << "Kapitan Portu: Koniec dnia, zamykam port.\n" << RESET;
     return 0;
 }

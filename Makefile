@@ -1,16 +1,26 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -pthread -Wall
+CXXFLAGS = -std=c++17 -pthread -Wall -I. -Iinterfaces -Iinfrastructure -Idomain
+
+INFRA_SOURCES = infrastructure/BridgeState.cpp \
+                infrastructure/ShipState.cpp \
+                infrastructure/MessageService.cpp \
+                IPCManager.cpp
+
+DOMAIN_SOURCES = domain/Passenger.cpp \
+                 domain/ShipCaptain.cpp \
+                 domain/PortCaptain.cpp
 
 all: port_captain ship_captain passenger
 
-port_captain: port_captain.cpp PortCaptain.cpp IPCManager.cpp IPCManager.hpp common.hpp IPCManager.hpp
-	$(CXX) $(CXXFLAGS) port_captain.cpp PortCaptain.cpp IPCManager.cpp -o port_captain
+port_captain: port_captain.cpp $(DOMAIN_SOURCES) $(INFRA_SOURCES)
+	$(CXX) $(CXXFLAGS) port_captain.cpp $(DOMAIN_SOURCES) $(INFRA_SOURCES) -o port_captain
 
-ship_captain: ship_captain.cpp ShipCaptain.cpp ShipCaptain.hpp common.hpp IPCManager.hpp
-	$(CXX) $(CXXFLAGS) ship_captain.cpp ShipCaptain.cpp IPCManager.cpp -o ship_captain
+ship_captain: ship_captain.cpp $(DOMAIN_SOURCES) $(INFRA_SOURCES)
+	$(CXX) $(CXXFLAGS) ship_captain.cpp $(DOMAIN_SOURCES) $(INFRA_SOURCES) -o ship_captain
 
-passenger: passenger.cpp pas.cpp pas.hpp common.hpp IPCManager.hpp
-	$(CXX) $(CXXFLAGS) passenger.cpp pas.cpp IPCManager.cpp -o passenger
+passenger: passenger.cpp $(DOMAIN_SOURCES) $(INFRA_SOURCES)
+	$(CXX) $(CXXFLAGS) passenger.cpp $(DOMAIN_SOURCES) $(INFRA_SOURCES) -o passenger
 
 clean:
-	rm -f port_captain ship_captain passenger rejs
+	rm -f port_captain ship_captain passenger rejs *.o
+	rm -f infrastructure/*.o domain/*.o

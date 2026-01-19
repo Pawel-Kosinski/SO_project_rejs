@@ -1,4 +1,3 @@
-// IPCManager.hpp
 #ifndef IPC_MANAGER_HPP
 #define IPC_MANAGER_HPP
 

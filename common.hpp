@@ -22,11 +22,11 @@
 #include <pthread.h>
 
 // Stałe konfiguracyjne
-constexpr int N = 90;               // Maksymalna liczba pasazerow na statku
+constexpr int N = 101;               // Maksymalna liczba pasazerow na statku
 constexpr int K = 50;               // Maksymalna liczba pasazerow na mostku
-constexpr int T1_SEC = 80;          // Czas miedzy rejsami (w sekundach)
-constexpr int T2_SEC = 10;          // Czas trwania rejsu
-constexpr int R = 5;                // Maksymalna liczba rejsow
+constexpr int T1_SEC = 30;          // Czas miedzy rejsami (w sekundach)
+constexpr int T2_SEC = 20;          // Czas trwania rejsu
+constexpr int R = 3;                // Maksymalna liczba rejsow
 constexpr int NUM_PASSENGERS = 100; // Liczba pasazerow
 
 constexpr int BRIDGE_SEM = 0;       // nr semafora mostek
@@ -65,6 +65,7 @@ struct SharedData {
     int unloading_allowed;  // 0 - nie, 1 - tak
     int unloading_finished; // licznik do zakonczenia rozladunku
     int terminate;          // flaga zakonczenia
+    int alarm_fired;          
     
     // Używamy pthread_mutex, ponieważ musi być process-shared
     pthread_mutex_t mutex;

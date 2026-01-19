@@ -1,24 +1,21 @@
-#include "ShipCaptain.hpp"
 #include "IPCManager.hpp"
+#include "domain/ShipCaptain.hpp"
+#include "infrastructure/ShipState.hpp"
+#include "infrastructure/MessageService.hpp"
+#include <memory>
+#include <atomic>
 
-SharedData *shared_data = nullptr;
-int shm_id = -1;
-int semid = -1;
-int msgid = -1;
+std::shared_ptr<IShipCaptainControl> g_ship_captain_control = nullptr;
 
 void alarmHandler(int sig) {
-    if (!shared_data) return;
-    pthread_mutex_lock(&shared_data->mutex);
-    if (shared_data->loading_finished == 0 && shared_data->terminate != 1) {
-        std::cout << BLUE << "Kapitan Statku: Czas na zaladunek uplynal.\n" << RESET;
-        shared_data->loading_finished = 1;
-    }
-    pthread_mutex_unlock(&shared_data->mutex);
+    g_ship_captain_control->setFlag();
+    std::cout << BLUE << "Kapitan Statku: Czas na załadunek upłynął.\n" << RESET;
 }
 
 int main() {
     signal(SIGALRM, alarmHandler);
-
+    
+    //  1. Podłącz się do istniejących zasobów 
     IPCManager ipc_manager;
     
     try {
@@ -29,26 +26,26 @@ int main() {
         return EXIT_FAILURE;
     }
     
-    semid = ipc_manager.getSemaphoreId();
-    msgid = ipc_manager.getMessageQueueId();
-    shared_data = ipc_manager.getSharedData();
-
-    std::cout << BLUE << "Kapitan Statku: Rozpoczynam prace.\n" << RESET;
-    //int voyages = 0;
-    ShipCaptain captain(semid, msgid, shared_data);
-
-    while (captain.voyages < R && !shared_data->terminate) {
-        captain.startBoarding();
-        captain.waitWhileBoarding();
-        captain.finishBoarding();
-        captain.startVoyage();
-        captain.finishVoyage();            
-        captain.shipUnload();        
-        captain.bridgeUnload();
-    }
-
-    captain.end();
+    //  2. Stwórz infrastrukturę (adaptery) 
+    auto ship_state = std::make_shared<ShipState>(
+        ipc_manager.getSemaphoreId(),
+        ipc_manager.getSharedData()
+    );
     
+    auto messaging = std::make_shared<MessageService>(
+        ipc_manager.getMessageQueueId(),
+        ipc_manager.getSharedData()
+    );
+    
+    //  3. Rzutuj na interfejs kapitana statku 
+    std::shared_ptr<IShipCaptainControl> captain_ship_control = ship_state;
+    
+    // Ustaw globalny wskaźnik dla alarm handlera
+    g_ship_captain_control = captain_ship_control;
+    
+    //  4. Uruchom logikę Kapitana Statku
+    ShipCaptain ship_captain(captain_ship_control, messaging);
+    ship_captain.run();
     
     return 0;
 }

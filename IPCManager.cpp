@@ -1,4 +1,3 @@
-// IPCManager.cpp
 #include "IPCManager.hpp"
 #include <sys/stat.h>
 
@@ -90,6 +89,7 @@ void IPCManager::initializeSharedData() {
     shared_data_->unloading_allowed = 0;
     shared_data_->unloading_finished = 0;
     shared_data_->terminate = 0;
+    shared_data_->alarm_fired = 0;
     
     std::cout << "IPCManager: Shared data zainicjalizowana.\n";
 }
